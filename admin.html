@@ -1,11 +1,319 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>BROWN Shop — Inventory</title><style>
-body{font:15px system-ui,Arial;background:#f7f4ec;color:#29231c;margin:0}main{max-width:1060px;margin:35px auto;padding:20px}h1{margin:0 0 8px}h2{margin-top:32px}p{color:#675f53}input,button{font:inherit;padding:9px;border:1px solid #b8aa96;border-radius:7px}button{background:#32241a;color:white;cursor:pointer}button:hover{background:#60452e}input[type=number]{width:85px}#token{min-width:240px}#message{padding:12px;color:#8b1717}table{border-collapse:collapse;width:100%;background:white}th,td{text-align:left;padding:11px;border-bottom:1px solid #e6ddd0}td:last-child{white-space:nowrap}.scroller{overflow-x:auto}.order{background:white;padding:12px;margin:10px 0;border-radius:8px}small{color:#675f53}
-</style></head><body><main><h1>BROWN Shop — Inventory & Orders</h1><p>Enter the server-side ADMIN_TOKEN to manage stock and see recent orders. Do not share it with customers.</p><input id="token" type="password" placeholder="Admin token" autocomplete="off"><button id="load">Sign in / Refresh</button><button id="logout">Clear token</button><div id="message" role="status"></div><section id="dashboard" hidden><h2>Product stock</h2><div class="scroller"><table><thead><tr><th>Product</th><th>Current stock</th><th>New stock</th><th>Action</th></tr></thead><tbody id="products"></tbody></table></div><h2>Latest 100 orders</h2><div id="orders"></div></section></main><script>
-const $=id=>document.getElementById(id);let token='';
-const msg=t=>$('message').textContent=t;
-async function request(method,body){const r=await fetch('/api/admin',{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:body?JSON.stringify(body):undefined,cache:'no-store'});const data=await r.json();if(!r.ok)throw Error(data.error||'Request failed');return data;}
-const td=(tr,text)=>{const c=document.createElement('td');c.textContent=String(text);tr.appendChild(c);return c;};
-async function load(){token=$('token').value.trim();if(!token)return msg('Admin token required');try{const data=await request('GET');const tbody=$('products');tbody.replaceChildren();for(const p of data.products){const tr=document.createElement('tr');td(tr,p.name);td(tr,p.stock);const input=document.createElement('input');input.type='number';input.min=0;input.max=1000000;input.value=p.stock;const cell=document.createElement('td');cell.appendChild(input);tr.appendChild(cell);const action=document.createElement('td');const b=document.createElement('button');b.textContent='Save';b.onclick=async()=>{const val=Number(input.value);if(!Number.isSafeInteger(val)||val<0)return msg('Enter a valid nonnegative stock');b.disabled=true;try{await request('PATCH',{id_menu:p.id_menu,stock:val});msg('Saved stock for '+p.name);await load();}catch(e){msg(e.message);}finally{b.disabled=false;}};action.appendChild(b);tr.appendChild(action);tbody.appendChild(tr);}
-const div=$('orders');div.replaceChildren();for(const o of data.orders){const el=document.createElement('div');el.className='order';const when=new Date(o.created_at).toLocaleString();const lines=o.items.map(x=>`${x.qty} × ${x.name}`).join(', ');el.textContent=`${o.ref} · ${when} · ${o.name} · ${o.phone} · $${(o.total_cents/100).toFixed(2)} · ${o.status} — ${lines}`;div.appendChild(el);}if(!data.orders.length)div.textContent='No orders yet.';$('dashboard').hidden=false;msg('Loaded '+data.products.length+' products and '+data.orders.length+' orders.');}catch(e){$('dashboard').hidden=true;msg(e.message);}}
-$('load').onclick=load;$('logout').onclick=()=>{token='';$('token').value='';$('dashboard').hidden=true;msg('Token cleared');};
-</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BROWN Shop — Inventory</title>
+<style>
+  :root{
+    --bg:#f7f4ec;
+    --surface:#ffffff;
+    --surface-2:#fbf8f2;
+    --ink:#29231c;
+    --muted:#6f665a;
+    --line:#e8dfd1;
+    --line-strong:#cfc2ae;
+    --brand:#32241a;
+    --brand-hover:#5a412b;
+    --accent:#b9773b;
+    --ok-bg:#e6f2e6; --ok-ink:#1f5e2b;
+    --warn-bg:#fdf0d5; --warn-ink:#8a5a00;
+    --bad-bg:#fbe4e1; --bad-ink:#8b1717;
+    --info-bg:#e8eef7; --info-ink:#27476e;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(50,36,26,.06),0 8px 24px rgba(50,36,26,.06);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#1b1612; --surface:#26201a; --surface-2:#2d261f;
+      --ink:#f1ebe1; --muted:#b0a493; --line:#3a3128; --line-strong:#55493b;
+      --brand:#d9a066; --brand-hover:#e6b07a;
+      --ok-bg:#1f3524; --ok-ink:#9fd8a8;
+      --warn-bg:#3b2f14; --warn-ink:#f0c46c;
+      --bad-bg:#3d1f1c; --bad-ink:#f2a39b;
+      --info-bg:#1f2a3b; --info-ink:#a9c4ea;
+      --shadow:none;
+    }
+    button{color:#1b1612 !important}
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  main{max-width:1060px; margin:0 auto; padding:40px 20px 64px}
+
+  /* Header */
+  .brand{display:flex; align-items:center; gap:14px; margin-bottom:6px}
+  .logo{
+    width:44px; height:44px; border-radius:12px; background:var(--brand);
+    color:#fff; display:grid; place-items:center; font-weight:800; font-size:20px;
+    box-shadow:var(--shadow);
+  }
+  h1{margin:0; font-size:26px; letter-spacing:-.02em; line-height:1.2}
+  h1 span{color:var(--muted); font-weight:500}
+  h2{margin:0; font-size:18px; letter-spacing:-.01em}
+  .lead{color:var(--muted); margin:10px 0 24px; max-width:60ch}
+
+  /* Cards */
+  .card{
+    background:var(--surface); border:1px solid var(--line);
+    border-radius:var(--radius); box-shadow:var(--shadow);
+  }
+  .login{padding:18px; display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+  .section{margin-top:32px}
+  .section-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:12px}
+  .count{color:var(--muted); font-size:13px}
+
+  /* Controls */
+  input,button{font:inherit; border-radius:10px; transition:border-color .15s, box-shadow .15s, background .15s, transform .05s}
+  input{
+    padding:10px 12px; border:1px solid var(--line-strong);
+    background:var(--surface-2); color:var(--ink);
+  }
+  input:focus-visible,button:focus-visible{
+    outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(185,119,59,.28);
+  }
+  input[type=number]{width:96px}
+  #token{flex:1 1 240px; min-width:0}
+  button{
+    padding:10px 16px; border:1px solid transparent; background:var(--brand);
+    color:#fff; font-weight:600; cursor:pointer;
+  }
+  button:hover{background:var(--brand-hover)}
+  button:active{transform:translateY(1px)}
+  button:disabled{opacity:.55; cursor:not-allowed}
+  button.ghost{background:transparent; color:var(--ink); border-color:var(--line-strong)}
+  button.ghost:hover{background:var(--surface-2)}
+  @media (prefers-color-scheme:dark){ button.ghost{color:var(--ink) !important} }
+
+  /* Message */
+  #message{
+    margin-top:14px; padding:0; border-radius:10px; font-weight:500;
+    max-height:0; overflow:hidden; opacity:0;
+    transition:max-height .2s, opacity .2s, padding .2s;
+  }
+  #message.show{padding:11px 14px; max-height:120px; opacity:1}
+  #message.ok{background:var(--ok-bg); color:var(--ok-ink)}
+  #message.err{background:var(--bad-bg); color:var(--bad-ink)}
+  #message.info{background:var(--info-bg); color:var(--info-ink)}
+
+  /* Table */
+  .scroller{overflow-x:auto; border-radius:var(--radius)}
+  table{border-collapse:collapse; width:100%; min-width:560px}
+  th,td{text-align:left; padding:13px 16px; border-bottom:1px solid var(--line); vertical-align:middle}
+  th{
+    font-size:12px; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--muted); background:var(--surface-2); font-weight:700;
+  }
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:var(--surface-2)}
+  td:last-child{white-space:nowrap}
+  .pname{font-weight:600}
+
+  /* Badges */
+  .badge{
+    display:inline-block; padding:3px 10px; border-radius:999px;
+    font-size:12px; font-weight:700; background:var(--ok-bg); color:var(--ok-ink);
+  }
+  .badge.low{background:var(--warn-bg); color:var(--warn-ink)}
+  .badge.out{background:var(--bad-bg); color:var(--bad-ink)}
+  .stock-num{font-variant-numeric:tabular-nums; font-weight:700; margin-right:8px}
+
+  /* Orders */
+  .orders{display:grid; gap:12px}
+  .order{padding:16px 18px}
+  .order-top{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px 16px}
+  .ref{font-weight:800; letter-spacing:.01em}
+  .total{font-weight:800; font-variant-numeric:tabular-nums}
+  .meta{color:var(--muted); font-size:13.5px; margin-top:4px}
+  .meta b{color:var(--ink); font-weight:600}
+  .items{display:flex; flex-wrap:wrap; gap:6px; margin-top:12px}
+  .chip{
+    background:var(--surface-2); border:1px solid var(--line);
+    padding:3px 10px; border-radius:8px; font-size:13px;
+  }
+  .status{
+    padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700;
+    background:var(--info-bg); color:var(--info-ink); text-transform:capitalize;
+  }
+  .status.paid,.status.completed,.status.delivered,.status.done{background:var(--ok-bg); color:var(--ok-ink)}
+  .status.pending,.status.processing{background:var(--warn-bg); color:var(--warn-ink)}
+  .status.cancelled,.status.canceled,.status.failed,.status.refunded{background:var(--bad-bg); color:var(--bad-ink)}
+  .empty{padding:28px; text-align:center; color:var(--muted)}
+
+  @media (max-width:560px){
+    main{padding:24px 14px 48px}
+    h1{font-size:22px}
+    .login button{flex:1 1 auto}
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">
+    <div class="logo" aria-hidden="true">B</div>
+    <h1>BROWN Shop <span>— Inventory &amp; Orders</span></h1>
+  </div>
+  <p class="lead">Enter the server-side ADMIN_TOKEN to manage stock and see recent orders. Do not share it with customers.</p>
+
+  <div class="card login">
+    <input id="token" type="password" placeholder="Admin token" autocomplete="off" aria-label="Admin token">
+    <button id="load">Sign in / Refresh</button>
+    <button id="logout" class="ghost">Clear token</button>
+  </div>
+  <div id="message" role="status" aria-live="polite"></div>
+
+  <section id="dashboard" hidden>
+    <div class="section">
+      <div class="section-head"><h2>Product stock</h2><span class="count" id="pcount"></span></div>
+      <div class="card scroller">
+        <table>
+          <thead><tr><th>Product</th><th>Current stock</th><th>New stock</th><th>Action</th></tr></thead>
+          <tbody id="products"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>Latest 100 orders</h2><span class="count" id="ocount"></span></div>
+      <div id="orders" class="orders"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+let token='';
+
+function msg(text,type){
+  const m=$('message');
+  m.textContent=text||'';
+  m.className=text?('show '+(type||'info')):'';
+}
+
+async function request(method,body){
+  const r=await fetch('/api/admin',{
+    method,
+    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:body?JSON.stringify(body):undefined,
+    cache:'no-store'
+  });
+  const data=await r.json();
+  if(!r.ok)throw Error(data.error||'Request failed');
+  return data;
+}
+
+function el(tag,cls,text){
+  const e=document.createElement(tag);
+  if(cls)e.className=cls;
+  if(text!==undefined)e.textContent=String(text);
+  return e;
+}
+
+function stockBadge(n){
+  if(n<=0)return el('span','badge out','Out of stock');
+  if(n<=5)return el('span','badge low','Low');
+  return el('span','badge','In stock');
+}
+
+async function load(){
+  token=$('token').value.trim();
+  if(!token)return msg('Admin token required','err');
+  try{
+    const data=await request('GET');
+
+    // Products
+    const tbody=$('products');
+    tbody.replaceChildren();
+    for(const p of data.products){
+      const tr=document.createElement('tr');
+
+      tr.appendChild(el('td','pname',p.name));
+
+      const stockCell=document.createElement('td');
+      stockCell.appendChild(el('span','stock-num',p.stock));
+      stockCell.appendChild(stockBadge(Number(p.stock)));
+      tr.appendChild(stockCell);
+
+      const input=document.createElement('input');
+      input.type='number';input.min=0;input.max=1000000;input.value=p.stock;
+      input.setAttribute('aria-label','New stock for '+p.name);
+      const inCell=document.createElement('td');
+      inCell.appendChild(input);
+      tr.appendChild(inCell);
+
+      const actCell=document.createElement('td');
+      const b=el('button',null,'Save');
+      b.onclick=async()=>{
+        const val=Number(input.value);
+        if(!Number.isSafeInteger(val)||val<0)return msg('Enter a valid nonnegative stock','err');
+        b.disabled=true;
+        try{
+          await request('PATCH',{id_menu:p.id_menu,stock:val});
+          await load();
+          msg('Saved stock for '+p.name,'ok');
+        }catch(e){msg(e.message,'err');}
+        finally{b.disabled=false;}
+      };
+      input.addEventListener('keydown',e=>{if(e.key==='Enter')b.click();});
+      actCell.appendChild(b);
+      tr.appendChild(actCell);
+
+      tbody.appendChild(tr);
+    }
+    $('pcount').textContent=data.products.length+' products';
+
+    // Orders
+    const div=$('orders');
+    div.replaceChildren();
+    for(const o of data.orders){
+      const card=el('div','card order');
+
+      const top=el('div','order-top');
+      const left=el('div');
+      left.appendChild(el('span','ref',o.ref));
+      left.appendChild(document.createTextNode(' '));
+      const st=String(o.status||'');
+      left.appendChild(el('span','status '+st.toLowerCase().replace(/[^a-z0-9]/g,''),st));
+      top.appendChild(left);
+      top.appendChild(el('span','total','$'+(o.total_cents/100).toFixed(2)));
+      card.appendChild(top);
+
+      const meta=el('div','meta');
+      const when=new Date(o.created_at).toLocaleString();
+      const name=el('b',null,o.name);
+      meta.appendChild(name);
+      meta.appendChild(document.createTextNode(' · '+o.phone+' · '+when));
+      card.appendChild(meta);
+
+      const items=el('div','items');
+      for(const x of o.items)items.appendChild(el('span','chip',x.qty+' × '+x.name));
+      card.appendChild(items);
+
+      div.appendChild(card);
+    }
+    if(!data.orders.length)div.appendChild(el('div','card empty','No orders yet.'));
+    $('ocount').textContent=data.orders.length+' orders';
+
+    $('dashboard').hidden=false;
+    msg('Loaded '+data.products.length+' products and '+data.orders.length+' orders.','ok');
+  }catch(e){
+    $('dashboard').hidden=true;
+    msg(e.message,'err');
+  }
+}
+
+$('load').onclick=load;
+$('token').addEventListener('keydown',e=>{if(e.key==='Enter')load();});
+$('logout').onclick=()=>{
+  token='';
+  $('token').value='';
+  $('dashboard').hidden=true;
+  msg('Token cleared','info');
+};
+</script>
+</body>
+</html>
