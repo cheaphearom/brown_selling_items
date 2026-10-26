@@ -6,7 +6,7 @@ module.exports = async (req, res) => {
   const { card_number, serial_number } = req.body || {};
   const input = validateCredentials(card_number, serial_number);
   if (!input) return json(res, 400, { error: 'Enter a valid card number and serial number.' });
-  if (!input.card.startsWith('999')) return json(res, 400, { error: 'Invalid loyalty card. Only card numbers starting with 999 are allowed.'});
+  if (!input.card.startsWith('999')) return json(res, 400, { error: 'Invalid loyalty card. Only staff cards are allowed.'});
   try {
     const hash = fingerprint(input.card, input.serial);
     const result = await getPool().query('SELECT 1 FROM shop_orders WHERE loyalty_key = $1 LIMIT 1', [hash]);
