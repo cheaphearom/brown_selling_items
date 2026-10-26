@@ -1,73 +1,35 @@
-# BROWN Shop (JSON only, no API)
+# BROWN Shop — live stock and order management
 
-A static page. There are **no API calls**. Everything comes from `data.json` or is saved in the visitor's browser.
+This version replaces browser-only order storage with PostgreSQL-backed Vercel API functions.
 
-## Files
+## Features
+- Customer menu loads live product stock from `GET /api/menu`.
+- `POST /api/orders` checks prices and stock on the server and atomically deducts stock, saving the order in the same database transaction. Orders with insufficient stock are rejected.
+- `admin.html` allows staff to sign in with an admin token, view the latest 100 orders, and change product stock.
+- Customer browser keeps a local order-history copy for convenience.
+- Loyalty-card verification is **disabled** until connected to a secure backend. The previously exposed sample `loyalty_cards` array has been removed from public `data.json`.
 
-| File | Purpose |
-|------|---------|
-| `index.html` | Page structure |
-| `style.css` | Styles |
-| `app.js` | All logic (cart, orders, loyalty check, receipt) |
-| `data.json` | Menu items and loyalty cards (edit this) |
-| `vercel.json` | Vercel settings |
+## Deployment
+1. Create a PostgreSQL database (e.g. Neon or Supabase Postgres), and obtain its connection string.
+2. Execute `schema.sql` against the database with your database SQL editor.
+3. Install Node.js, then from this directory run `npm install`.
+4. Set environment variable `DATABASE_URL` to the PostgreSQL connection string locally. Run `npm run seed` **once** to import products from `data.json`. The seed preserves existing stock on repeated runs.
+5. Set `DATABASE_URL` and a long random `ADMIN_TOKEN` in the Vercel project settings (Environment Variables) for Production (and Preview separately if needed).
+6. Deploy/redeploy this project to Vercel, then test the menu and submit a small test order. Visit `/admin` or `/admin.html` to manage stock.
 
-## What runs where
+### Required environment variables
 
-- **Menu:** read from `data.json`.
-- **Loyalty card:** checked against `loyalty_cards` in `data.json`.
-- **Orders:** created in the browser and saved on the customer's device (localStorage) for 7 days.
-- **Receipt:** an HTML file generated in the browser.
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string (server-side only) |
+| `ADMIN_TOKEN` | Long random private staff/admin token (server-side only) |
 
-## Important limits (because there is no server)
+**Never put either secret in `app.js`, `data.json`, or GitHub.** The admin token is entered directly by authorized staff on the admin page. For multi-staff or public production use, replace the shared admin token with authenticated staff accounts and audit logs.
 
-- **The shop does not receive orders automatically.** Orders only exist on the customer's own device.
-  To get orders, set `SHOP_WHATSAPP` in `app.js` (digits with country code, e.g. `'855123456789'`).
-  The customer then gets a button that sends the order to your WhatsApp.
-- **Stock is not tracked.** `menu_stock` only decides whether an item shows "Out of stock". Edit `data.json` and redeploy to change it.
-- **No live order status.** There is no "preparing / ready" tracking.
-- **`data.json` is public.** Anyone can open `/data.json`, including the `loyalty_cards` list (card numbers and serials). Do not put real members there.
-
-## Edit the menu
-
-Edit the rows in `result.data`:
-
-```json
-{
-  "id_menu_group": "1",
-  "group_name": "Coffee",
-  "id_menu_category": "520161962052305249",
-  "category_name": "Hot Drinks",
-  "id_menu": "1001",
-  "menu_name": "Hot Latte",
-  "menu_price": "2.50",
-  "menu_discount": 0,
-  "menu_picture": "null",
-  "index_number": 1,
-  "status": 3,
-  "menu_stock": 20,
-  "deleted_date": "1900-01-01"
-}
-```
-
-- `menu_picture`: a filename (uses `MENU_IMAGE_BASE` in `app.js`), a full `https://` URL, or `"null"` for the placeholder.
-- `menu_discount`: percent off (20 = 20%).
-- `menu_stock`: 0 or less shows "Out of stock".
-- `status: 0` hides the item.
-
-## Test locally
-
-```bash
-npx serve .
-```
-
-Opening `index.html` by double-click will not work, because browsers block `fetch('./data.json')` from `file://`.
-
-## Deploy to Vercel
-
-1. Push this folder to a GitHub repository.
-2. Go to https://vercel.com/new and import the repository.
-3. Framework Preset: **Other**. Leave Build Command and Output Directory empty.
-4. Click **Deploy**.
-
-Or from the folder: `npm i -g vercel` then `vercel --prod`.
+## Important behavior
+- Stock decreases when an order is **placed**, not when payment is captured; there is no payment integration in this project.
+- There is no order cancellation/restock workflow yet. Staff can manually correct stock in the admin page.
+- Product names/prices are initially seeded from `data.json`, but subsequent edits to that file alone do not update the database. Edit your products in the database or extend the admin UI.
+- The `MAX_ORDER_QTY` limit is 2, enforced both client- and server-side.
+- Use HTTPS and configure suitable rate limiting / bot protection for public commerce. This example should be hardened (staff auth, server-side customer verification, payment handling, availability monitoring, audit logs) before real retail production use.
+- The original `data.json` is still deployed as a reference but is **not** the live stock source.
