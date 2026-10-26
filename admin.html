@@ -386,6 +386,7 @@
             <button data-f="low">Low</button>
             <button data-f="out">Out</button>
           </div>
+          <button id="exp-stock" class="ghost" type="button">⬇ Export Excel</button>
         </div>
       </div>
       <div id="products" class="grid"></div>
@@ -396,6 +397,7 @@
         <h2>Latest 100 orders<span id="ocount"></span></h2>
         <div class="tools">
           <input id="osearch" class="search" type="search" placeholder="Search name, phone, ref, card last 4…" aria-label="Search orders">
+          <button id="exp-orders" class="ghost" type="button">⬇ Export Excel</button>
         </div>
       </div>
       <div id="orders" class="orders"></div>
@@ -785,15 +787,26 @@ function productCard(p,max){
   return card;
 }
 
-function renderProducts(){
+// Products matching the current search + Low/Out filter (also used by the export).
+function filteredProducts(){
   const q=$('psearch').value.trim().toLowerCase();
-  const max=Math.max(20,...state.products.map(p=>stockNum(p.stock)));
-  const list=state.products.filter(p=>{
+  return state.products.filter(p=>{
     const lv=level(p.stock);
     if(pFilter==='low'&&lv!=='low')return false;
     if(pFilter==='out'&&lv!=='out')return false;
     return !q||String(p.name).toLowerCase().includes(q);
   });
+}
+// Orders matching the current search (also used by the export).
+// Card search matches the last 4 characters only, never the full number.
+function filteredOrders(){
+  const q=$('osearch').value.trim().toLowerCase();
+  return state.orders.filter(o=>!q||[o.ref,o.name,o.phone,last4(o.card_number||o.loyalty)].some(v=>String(v||'').toLowerCase().includes(q)));
+}
+
+function renderProducts(){
+  const max=Math.max(20,...state.products.map(p=>stockNum(p.stock)));
+  const list=filteredProducts();
   const box=$('products'); box.replaceChildren();
   for(const p of list)box.appendChild(productCard(p,max));
   if(!list.length){
@@ -806,9 +819,7 @@ function renderProducts(){
 }
 
 function renderOrders(){
-  const q=$('osearch').value.trim().toLowerCase();
-  // card search matches the last 4 characters only, never the full number
-  const list=state.orders.filter(o=>!q||[o.ref,o.name,o.phone,last4(o.card_number||o.loyalty)].some(v=>String(v||'').toLowerCase().includes(q)));
+  const list=filteredOrders();
   const box=$('orders'); box.replaceChildren();
   for(const o of list){
     const card=el('div','order');
@@ -907,7 +918,60 @@ function logout(){
   $('token').focus();
 }
 
+/* ---------- Excel (CSV) export ---------- */
+// Opens directly in Excel. Cells that could be run as formulas (=, @, or +/- followed by
+// non-number text) get a leading apostrophe. `{text:v}` forces text (keeps leading zeros in phones).
+function csvCell(v){
+  let text=(v&&typeof v==='object'&&'text' in v)?'\t'+String(v.text??''):String(v??'');
+  if(/^[=@\t\r]/.test(text)&&!(v&&typeof v==='object'))text="'"+text;
+  else if(/^[+\-](?![\d\s()\-]*$)/.test(text))text="'"+text;
+  return '"'+text.replace(/"/g,'""')+'"';
+}
+function downloadCSV(filename,rows){
+  // The BOM (\uFEFF) makes Excel read Khmer and other non-English text correctly
+  const csv='\uFEFF'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a');
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+const today=()=>new Date().toISOString().slice(0,10);
+
+function exportOrders(){
+  const list=filteredOrders();
+  if(!list.length)return toast('No orders to export','err');
+  const rows=[['Ref','Placed','Name','Phone','Loyalty card','Status','Items','Total (USD)']];
+  for(const o of list){
+    rows.push([
+      o.ref,
+      new Date(o.created_at).toLocaleString(),
+      o.name,
+      {text:o.phone},
+      maskCard(o.card_number||o.loyalty),            // masked only, never the full number or serial
+      o.status,
+      (o.items||[]).map(x=>x.qty+'× '+x.name).join('; '),
+      ((Number(o.total_cents)||0)/100).toFixed(2)    // plain number so Excel can sum it
+    ]);
+  }
+  downloadCSV('orders-'+today()+'.csv',rows);
+  toast('Exported '+list.length+' orders','ok');
+}
+function exportStock(){
+  const list=filteredProducts();
+  if(!list.length)return toast('No products to export','err');
+  const rows=[['ID','Product','Stock','Status']];
+  for(const p of list){
+    const lv=level(p.stock);
+    rows.push([p.id_menu,p.name,stockNum(p.stock),lv==='out'?'Out of stock':lv==='low'?'Low stock':'In stock']);
+  }
+  downloadCSV('stock-'+today()+'.csv',rows);
+  toast('Exported '+list.length+' products','ok');
+}
+
 /* ---------- events ---------- */
+$('exp-orders').onclick=exportOrders;
+$('exp-stock').onclick=exportStock;
 $('load').onclick=login;
 $('token').addEventListener('keydown',e=>{if(e.key==='Enter')login();});
 $('refresh').onclick=async()=>{

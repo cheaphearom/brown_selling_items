@@ -11,7 +11,7 @@ module.exports = async (req, res) => {
       const [p, o] = await Promise.all([
         // `payload` is returned whole so the page can find the product image + extra details.
         getPool().query('SELECT id_menu, payload->>\'menu_name\' AS name, payload, stock FROM products ORDER BY name'),
-        getPool().query('SELECT ref, customer_name AS name, phone, items, total_cents, status, created_at FROM shop_orders ORDER BY created_at DESC LIMIT 100')
+        getPool().query('SELECT ref, customer_name AS name, phone, items, total_cents, status, created_at FROM shop_orders ORDER BY created_at DESC LIMIT 1000')
       ]);
       return json(res, 200, { products: p.rows, orders: o.rows });
     }
