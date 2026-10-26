@@ -1,11 +1,10 @@
 'use strict';
 // =====================================================================
 // CONFIG — everything in this file is visible to anyone who opens the page.
-// NO API. Everything comes from ./data.json or is saved in this browser (localStorage):
-//   menu items, loyalty cards  -> data.json
-//   orders, receipts           -> created in the browser, kept on the customer's device
+// Products and orders come from the server API. Order history is also cached in this browser.
+// Loyalty verification is disabled pending a secure server-side integration.
 // =====================================================================
-const DATA_URL = './data.json';
+const DATA_URL = '/api/menu';
 const SHOP_NAME = 'BROWN';
 // Optional: put the shop's WhatsApp number (digits only, with country code, e.g. '855123456789').
 // When set, the customer gets a button that sends the order to the shop. Leave '' to hide it.
@@ -99,7 +98,7 @@ function closeAlert() {
 }
 
 function friendlyError(e) {
-  if (e instanceof TypeError) return 'Could not read data.json. Check that the file exists next to index.html.';
+  if (e instanceof TypeError) return 'Could not connect to the shop API. Please try again.';
   return (e && e.message) || 'Something went wrong. Please try again.';
 }
 
@@ -130,7 +129,7 @@ function menuPicture(p) {
   return MENU_IMAGE_BASE ? MENU_IMAGE_BASE + encodeURIComponent(p) : '';
 }
 
-// Loads data.json once. Menu rows: {result:{data:[...]}}, {data:[...]} or a plain array.
+// Loads the API menu once. Menu rows: {result:{data:[...]}}, {data:[...]} or a plain array.
 async function fetchData() {
   if (DATA) return DATA;
   const res = await fetch(DATA_URL, { cache: 'no-store' });
@@ -152,7 +151,7 @@ function menuRows(json) {
   }
   return rows;
 }
-const loyaltyCards = (json) => (json && Array.isArray(json.loyalty_cards)) ? json.loyalty_cards : [];
+const loyaltyCards = () => []; // Loyalty lookup disabled until a secure server-side verification API is configured.
 
 // Flat rows -> groups[].categories[].items[]
 function buildGroups(rows) {
@@ -349,9 +348,8 @@ function renderDetails() {
   const L = flow.loyalty;
   body.innerHTML = `
     <label class="field"><span>Name *</span><input id="fName" maxlength="60" autocomplete="name" value="${esc(flow.details.name)}"></label>
-    <label class="field"><span>Phone * (or verify a loyalty card)</span><input id="fPhone" type="tel" maxlength="20" autocomplete="tel" value="${esc(flow.details.phone)}"></label>
-    <h4>Loyalty card (optional)</h4>
-    <div id="lyBox">${L ? loyaltyOk(L) : `
+    <label class="field"><span>Phone *</span><input id="fPhone" type="tel" maxlength="20" autocomplete="tel" value="${esc(flow.details.phone)}"></label>
+    <div id="lyBox" style="display:none">${L ? loyaltyOk(L) : `
       <label class="field"><span>Card number</span><input id="lyCard" inputmode="numeric" maxlength="32" autocomplete="off" spellcheck="false"></label>
       <label class="field"><span>Serial number</span><input id="lySerial" type="password" maxlength="32" autocomplete="off" spellcheck="false"></label>
       <button type="button" class="btn btn-ghost" id="lyBtn" style="width:100%">Verify card</button>`}</div>
@@ -409,25 +407,41 @@ function updateOrdersBadge() {
 }
 const shortRef = (ref) => '#' + String(ref).slice(-6).toUpperCase();
 
-function placeOrder() {
+async function placeOrder() {
   keepDetails();
   if (!cart.length) return showAlert('Cart is empty', 'Add an item to your cart first.', 'info');
   if (!flow.details.name) return showAlert('Name needed', 'Please enter your name.', 'info');
-  if (!flow.details.phone && !flow.loyalty) return showAlert('Phone number needed', 'Please enter your phone number, or verify a loyalty card.', 'info');
+  if (!flow.details.phone) return showAlert('Phone number needed', 'Please enter your phone number.', 'info');
   const lines = cart.filter(l => lookup[l.k]).map(l => {
     const it = lookup[l.k].item, unit = finalPrice(it);
-    return { name: it.item_name, qty: l.q, unit, total: Math.round(unit * 100) * l.q / 100 };
+    return { id_menu: String(it.item_id), name: it.item_name, qty: l.q, unit, total: Math.round(unit * 100) * l.q / 100 };
   });
   if (!lines.length) return showAlert('Cart is empty', 'Add an item to your cart first.', 'info');
   const total = lines.reduce((s, x) => s + Math.round(x.total * 100), 0) / 100;
   const o = {
-    ref: uuid().replace(/-/g, '').slice(0, 12).toUpperCase(), at: Date.now(),
+    ref: uuid(), at: Date.now(),
     name: flow.details.name, phone: flow.details.phone,
     loyalty: flow.loyalty ? flow.loyalty.masked : '', items: lines, total
   };
-  orders.add(o);
-  cart = []; saveCart(); flow.loyalty = null;
-  renderDone(o);
+  const btn = $('bPlace');
+  if (btn) btn.disabled = true;
+  showLoading('Saving order and updating stock…');
+  try {
+    const res = await fetch('/api/orders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref: o.ref, name: o.name, phone: o.phone, loyalty: o.loyalty,
+        items: lines.map(x => ({ id_menu: x.id_menu, qty: x.qty })) })
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Could not place order.');
+    orders.add(result.order);
+    cart = []; saveCart(); flow.loyalty = null;
+    DATA = null;
+    renderDone(result.order);
+    loadMenu();
+  } catch (err) {
+    showAlert('Order not placed', friendlyError(err));
+  } finally { hideLoading(); if (btn) btn.disabled = false; }
 }
 
 // WhatsApp message text for the shop (only used when SHOP_WHATSAPP is set)
@@ -443,7 +457,7 @@ const waButton = (o) => SHOP_WHATSAPP
 function renderDone(o) {
   setHead('Order saved', STEPS, 4); body.onclick = null; openModal();
   body.innerHTML = `
-    <div class="success"><div class="success-check">✓</div><h3>Order placed!</h3><p>Your order is saved on this device.</p></div>
+    <div class="success"><div class="success-check">✓</div><h3>Order placed!</h3><p>Your order was saved by the shop. A copy is also kept on this device.</p></div>
     <div class="ticket">
       <div class="ticket-top"><div><span>Order</span><strong>${esc(shortRef(o.ref))}</strong></div></div>
       ${o.items.map(i => `<div class="summary-row"><span>${esc(i.qty)} × ${esc(i.name)}</span><span>${money(i.total)}</span></div>`).join('')}

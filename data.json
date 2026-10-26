@@ -116,13 +116,5 @@
         "deleted_date": "1900-01-01 00:00:00"
       }
     ]
-  },
-  "loyalty_cards": [
-    {
-      "card_number": "10000001",
-      "serial_number": "ABC123",
-      "name": "Sample Member",
-      "points": 120
-    }
-  ]
+  }
 }
