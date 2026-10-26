@@ -6,9 +6,9 @@ module.exports = async (req, res) => {
   const { card_number, serial_number } = req.body || {};
   const input = validateCredentials(card_number, serial_number);
   if (!input) return json(res, 400, { error: 'Enter a valid card number and serial number.' });
-  if (!input.card.startsWith('999')) return json(res, 400, { error: 'Invalid loyalty card. Only staff cards are allowed.'});
+  if (!input.card.startsWith('999')) return json(res, 400, { error: 'Invalid loyalty card. Only staff card are allowed.'});
   try {
-    const hash = fingerprint(input.card, input.serial);
+    const hash = fingerprint(input.card);
     const result = await getPool().query('SELECT 1 FROM shop_orders WHERE loyalty_key = $1 LIMIT 1', [hash]);
     if (result.rowCount) return json(res, 409, { error: 'This card number and serial number have already been used to place an order.' });
     return json(res, 200, { available: true, message: 'Card details have not been used for an order. Card authenticity has not been verified.' });
