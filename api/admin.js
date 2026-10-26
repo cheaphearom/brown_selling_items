@@ -1,15 +1,16 @@
 const { getPool } = require('../lib/db');
 const { json, admin } = require('../lib/http');
 
-// Must match the STATUSES list in the admin page.
-const ORDER_STATUSES = ['pending', 'paid', 'processing', 'shipped', 'completed', 'cancelled'];
+// Must match the STATUSES list in admin.html.
+const ORDER_STATUSES = ['pending', 'paid', 'completed', 'cancelled'];
 
 module.exports = async (req, res) => {
   if (!admin(req)) return json(res, 401, { error: 'Unauthorized' });
   try {
     if (req.method === 'GET') {
       const [p, o] = await Promise.all([
-        getPool().query('SELECT id_menu, payload->>\'menu_name\' AS name, stock FROM products ORDER BY name'),
+        // `payload` is returned whole so the page can find the product image + extra details.
+        getPool().query('SELECT id_menu, payload->>\'menu_name\' AS name, payload, stock FROM products ORDER BY name'),
         getPool().query('SELECT ref, customer_name AS name, phone, items, total_cents, status, created_at FROM shop_orders ORDER BY created_at DESC LIMIT 100')
       ]);
       return json(res, 200, { products: p.rows, orders: o.rows });
@@ -30,6 +31,27 @@ module.exports = async (req, res) => {
         );
         if (!r.rowCount) return json(res, 404, { error: 'Order not found.' });
         return json(res, 200, { order: r.rows[0] });
+      }
+
+      // --- Edit product name / image: { id_menu, name, image } ---
+      if (typeof body.id_menu === 'string' && body.stock === undefined) {
+        const name = typeof body.name === 'string' ? body.name.trim() : '';
+        const image = typeof body.image === 'string' ? body.image.trim() : '';
+        if (!name || name.length > 200) return json(res, 400, { error: 'Product name is required (max 200 characters).' });
+        if (image.length > 2000 || (image && !/^(https?:\/\/|\/)/i.test(image))) {
+          return json(res, 400, { error: 'Image must be empty, or start with http(s):// or /' });
+        }
+        // NOTE: `||` needs payload to be JSONB. Image is stored under the key "image".
+        const r = await getPool().query(
+          `UPDATE products
+              SET payload = payload || jsonb_build_object('menu_name', $1::text, 'image', $2::text),
+                  updated_at = now()
+            WHERE id_menu = $3
+        RETURNING id_menu, payload->>'menu_name' AS name, payload, stock`,
+          [name, image, body.id_menu]
+        );
+        if (!r.rowCount) return json(res, 404, { error: 'Product not found.' });
+        return json(res, 200, { product: r.rows[0] });
       }
 
       // --- Update product stock: { id_menu, stock } ---

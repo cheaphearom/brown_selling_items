@@ -76,6 +76,8 @@
     background:var(--surface); color:var(--ink); border-color:var(--line-strong); box-shadow:none;
   }
   button.ghost:hover{background:var(--surface-2)}
+  button.danger{background:var(--surface); color:var(--bad); border-color:var(--line-strong); box-shadow:none}
+  button.danger:hover{background:var(--bad-bg)}
 
   /* ---------- Auth hero ---------- */
   #auth{min-height:100vh; display:grid; place-items:center; padding:32px 20px}
@@ -157,7 +159,6 @@
   .pcard:hover{transform:translateY(-2px); border-color:var(--line-strong)}
   .ptop{display:flex; justify-content:space-between; gap:10px; align-items:flex-start}
   .pname{font:700 18px/1.25 var(--serif)}
-  .pid{font-size:12px; color:var(--muted)}
   .badge{
     flex:0 0 auto; padding:4px 11px; border-radius:999px; font-size:12px; font-weight:700;
     background:var(--ok-bg); color:var(--ok);
@@ -187,6 +188,17 @@
   .editor .save{flex:1}
   .editor .save.idle{background:var(--surface-2); color:var(--muted); box-shadow:none; border-color:var(--line)}
   .editor .save.idle:hover{transform:none; filter:none}
+
+  /* ---------- Product image + actions ---------- */
+  .pmedia{
+    aspect-ratio:4/3; overflow:hidden; display:grid; place-items:center;
+    background:linear-gradient(145deg,var(--accent-soft),var(--surface-2));
+  }
+  .pmedia img{width:100%; height:100%; object-fit:cover; display:block}
+  .pph{font:700 56px var(--serif); color:var(--accent); opacity:.85}
+  .pcard .pmedia{margin:-18px -18px 0; border-radius:var(--radius) var(--radius) 0 0}
+  .pactions{display:flex; gap:8px; padding-top:14px; border-top:1px dashed var(--line)}
+  .pactions button{flex:1; padding:9px 10px; font-size:14px}
 
   /* ---------- Orders ---------- */
   .orders{display:grid; gap:12px}
@@ -258,7 +270,7 @@
   .status-edit .save.idle{background:var(--surface-2); color:var(--muted); box-shadow:none; border-color:var(--line)}
   .status-edit .save.idle:hover{transform:none; filter:none}
 
-  /* ---------- Order detail dialog ---------- */
+  /* ---------- Dialogs ---------- */
   dialog{
     width:calc(100% - 28px); max-width:580px; max-height:calc(100vh - 40px); padding:0; border:1px solid var(--line);
     border-radius:22px; background:var(--surface); color:var(--ink); box-shadow:0 30px 80px rgba(0,0,0,.4);
@@ -283,6 +295,13 @@
   .line .q{color:var(--accent); font-weight:800; margin-right:8px}
   .line.total{background:var(--surface-2); font-weight:800; font-size:17px}
   .line.total span:last-child{font-family:var(--serif); font-size:20px}
+  .dlg-body .pmedia{border-radius:16px; aspect-ratio:16/10}
+  .dlg-actions{display:flex; gap:10px; flex-wrap:wrap}
+  .dlg-actions button{flex:1}
+  .field{display:grid; gap:6px}
+  .field label{font-size:12px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--muted)}
+  .field input{width:100%}
+  .field small{color:var(--muted)}
 
   /* ---------- Toast ---------- */
   #toasts{position:fixed; right:18px; bottom:18px; z-index:50; display:grid; gap:10px; max-width:min(380px,calc(100vw - 36px))}
@@ -326,7 +345,7 @@
       </div>
       <div id="message" class="login-err" role="status" aria-live="polite" hidden></div>
     </div>
-    <div class="secure">🔒 Server-side ADMIN_TOKEN — never share it with customers.</div>
+    <div class="secure">Server-side ADMIN_TOKEN — never share it with customers.</div>
   </div>
 </section>
 
@@ -349,11 +368,11 @@
     <div class="stats" id="stats"></div>
 
     <nav class="tabs" role="tablist" aria-label="Sections">
-      <button class="tab on" id="tabbtn-stock" data-tab="stock" role="tab" aria-selected="true" aria-controls="tab-stock">
-        📦 Stock <span class="count" id="tc-stock">0</span>
+      <button class="tab on" id="tabbtn-stock" data-tab="stock" role="tab" aria-selected="true" aria-controls="tab-stock" tabindex="0">
+        Stock <span class="count" id="tc-stock">0</span>
       </button>
-      <button class="tab" id="tabbtn-orders" data-tab="orders" role="tab" aria-selected="false" aria-controls="tab-orders">
-        🧾 Orders <span class="count" id="tc-orders">0</span>
+      <button class="tab" id="tabbtn-orders" data-tab="orders" role="tab" aria-selected="false" aria-controls="tab-orders" tabindex="-1">
+        Orders <span class="count" id="tc-orders">0</span>
       </button>
     </nav>
 
@@ -376,7 +395,7 @@
       <div class="section-head">
         <h2>Latest 100 orders<span id="ocount"></span></h2>
         <div class="tools">
-          <input id="osearch" class="search" type="search" placeholder="Search name, phone, ref…" aria-label="Search orders">
+          <input id="osearch" class="search" type="search" placeholder="Search name, phone, ref, card last 4…" aria-label="Search orders">
         </div>
       </div>
       <div id="orders" class="orders"></div>
@@ -386,12 +405,22 @@
   </main>
 </div>
 
+<!-- Order detail dialog -->
 <dialog id="odlg" aria-labelledby="odlg-title">
   <div class="dlg-head">
     <h3 id="odlg-title">Order</h3>
     <button id="odlg-close" class="ghost close" aria-label="Close">✕</button>
   </div>
   <div id="odlg-body" class="dlg-body"></div>
+</dialog>
+
+<!-- Product detail / edit dialog -->
+<dialog id="pdlg" aria-labelledby="pdlg-title">
+  <div class="dlg-head">
+    <h3 id="pdlg-title">Product</h3>
+    <button id="pdlg-close" class="ghost close" aria-label="Close">✕</button>
+  </div>
+  <div id="pdlg-body" class="dlg-body"></div>
 </dialog>
 
 <div id="toasts" aria-live="polite"></div>
@@ -402,6 +431,9 @@ let token='';
 let state={products:[],orders:[]};
 let pFilter='all';
 const LOW=5;
+const MAX_STOCK=1000000;
+// Orders with these statuses are not counted as revenue.
+const NON_REVENUE=['cancelled','canceled','refunded','failed'];
 
 /* ---------- helpers ---------- */
 function el(tag,cls,text){
@@ -421,11 +453,55 @@ function msg(text,type){
   if(!$('dashboard').hidden){ if(text)toast(text,type); return; }
   m.hidden=!text; m.textContent=text||'';
 }
-const money=c=>'$'+(Number(c)/100).toFixed(2);
-const level=n=>n<=0?'out':(n<=LOW?'low':'ok');
+const money=c=>'$'+((Number(c)||0)/100).toFixed(2);
+const stockNum=v=>{const n=Number(v);return Number.isFinite(n)?n:0;};   // null / NaN -> 0
+const level=n=>{n=stockNum(n);return n<=0?'out':(n<=LOW?'low':'ok');};
+
+// Never show a full card number in the admin: last 4 characters only.
+const last4=v=>String(v||'').replace(/[^\w]/g,'').slice(-4);
+const maskCard=v=>last4(v)?'•••• '+last4(v):'';
+
+/* ---------- product image helpers ---------- */
+// Same rules as the storefront: `menu_picture` is a bare filename (or the string "null")
+// that lives under MENU_IMAGE_BASE, or a full https:// URL.
+const MENU_IMAGE_BASE='https://www.browncoffee.com.kh/uploads/ximg/item_menus/';
+
+function menuPicture(p){
+  p=String(p||'').trim();
+  if(!p||p==='null')return '';
+  if(/^https:\/\//i.test(p))return p;
+  return MENU_IMAGE_BASE+encodeURIComponent(p);
+}
+// Raw stored value (what the edit box shows).
+function rawPicture(p){
+  const v=String(((p&&p.payload)||{}).menu_picture||'').trim();
+  return v==='null'?'':v;
+}
+const productImage=p=>menuPicture(rawPicture(p));      // full URL for <img>
+const safeSrc=u=>/^https:\/\//i.test(u||'')?u:'';      // https only (also blocks //host/x.jpg)
+const validImageInput=v=>/^https:\/\//i.test(v)||/^[^\/\\:?#\s]+$/.test(v);
+
+// Image box with a letter placeholder when there is no image or it fails to load.
+function productMedia(p){
+  const box=el('div','pmedia');
+  const showPlaceholder=()=>{
+    box.replaceChildren(el('div','pph',(String(p.name||'?').trim()[0]||'?').toUpperCase()));
+  };
+  const src=safeSrc(productImage(p));
+  if(src){
+    const img=document.createElement('img');
+    img.alt=p.name||'Product image';
+    img.loading='lazy';
+    img.referrerPolicy='no-referrer';
+    img.onerror=showPlaceholder;
+    img.src=src;
+    box.appendChild(img);
+  }else showPlaceholder();
+  return box;
+}
 
 /* ---------- order status + detail ---------- */
-const STATUSES=['pending','paid', 'completed','cancelled'];
+const STATUSES=['pending','paid','completed','cancelled'];
 const statusClass=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
 
 // Dropdown + button that PATCHes the order status. `after(updatedRef)` runs once saved.
@@ -446,7 +522,7 @@ function statusControl(o,after){
     if(sel.value===initial)return;
     btn.disabled=true; sel.disabled=true;
     try{
-      await request('PATCH',{id_order:o.id,ref:o.ref,status:sel.value});
+      await request('PATCH',{ref:o.ref,status:sel.value});
       await refresh(true);
       toast('Order '+o.ref+' → '+sel.value,'ok');
       if(after)after(o.ref);
@@ -461,11 +537,11 @@ function openOrder(o){
   $('odlg-title').textContent='Order '+o.ref;
   body.replaceChildren();
 
-  // customer / info
   const dl=el('dl','dl');
   const row=(k,v)=>{ if(v===undefined||v===null||v==='')return; dl.appendChild(el('dt',null,k)); dl.appendChild(el('dd',null,v)); };
   row('Customer',o.name);
   row('Phone',o.phone);
+  row('Loyalty card',maskCard(o.card_number||o.loyalty));   // masked, never the full number or serial
   row('Placed',new Date(o.created_at).toLocaleString());
   row('Address',o.address);
   row('Note',o.note||o.notes);
@@ -473,7 +549,6 @@ function openOrder(o){
   dl.appendChild(el('dt',null,'Status')); dl.appendChild(stDd);
   body.appendChild(dl);
 
-  // items
   const itemsWrap=el('div');
   itemsWrap.appendChild(el('p','dlg-sub','Items'));
   const lines=el('div','lines');
@@ -492,7 +567,6 @@ function openOrder(o){
   itemsWrap.appendChild(lines);
   body.appendChild(itemsWrap);
 
-  // change status
   const sw=el('div');
   sw.appendChild(el('p','dlg-sub','Change status'));
   sw.appendChild(statusControl(o,ref=>{
@@ -504,6 +578,95 @@ function openOrder(o){
   if(!dlg.open)dlg.showModal();
 }
 
+/* ---------- product detail + edit ---------- */
+function openProduct(p,edit){
+  const dlg=$('pdlg'), body=$('pdlg-body');
+  $('pdlg-title').textContent=p.name||'Product';
+  body.replaceChildren();
+
+  if(!edit){
+    body.appendChild(productMedia(p));
+
+    const dl=el('dl','dl');
+    const row=(k,v)=>{ if(v===undefined||v===null||v==='')return; dl.appendChild(el('dt',null,k)); dl.appendChild(el('dd',null,v)); };
+    row('ID',p.id_menu);
+    row('Stock',stockNum(p.stock).toLocaleString());
+    const lv=level(p.stock);
+    const stDd=el('dd'); stDd.appendChild(el('span','badge '+(lv==='ok'?'':lv),lv==='out'?'Out of stock':lv==='low'?'Low stock':'In stock'));
+    dl.appendChild(el('dt',null,'Status')); dl.appendChild(stDd);
+    // every other field stored in the product payload
+    for(const [k,v] of Object.entries(p.payload||{})){
+      if(k==='menu_name'||k==='menu_picture')continue;
+      if(v===null||v===''||v===undefined)continue;
+      let text=(typeof v==='object')?JSON.stringify(v):String(v);
+      if(text.length>300)text=text.slice(0,300)+'…';
+      row(k.replace(/_/g,' '),text);
+    }
+    body.appendChild(dl);
+
+    const acts=el('div','dlg-actions');
+    const editBtn=el('button',null,'Edit product'); editBtn.type='button';
+    editBtn.onclick=()=>openProduct(p,true);
+    const closeBtn=el('button','ghost','Close'); closeBtn.type='button';
+    closeBtn.onclick=()=>dlg.close();
+    acts.append(editBtn,closeBtn);
+    body.appendChild(acts);
+  }else{
+    const preview=el('div');
+    preview.appendChild(productMedia(p));
+    body.appendChild(preview);
+
+    const f1=el('div','field');
+    f1.appendChild(el('label',null,'Product name'));
+    const nameIn=document.createElement('input');
+    nameIn.type='text'; nameIn.maxLength=200; nameIn.value=p.name||'';
+    f1.appendChild(nameIn);
+    body.appendChild(f1);
+
+    const f2=el('div','field');
+    f2.appendChild(el('label',null,'Image'));
+    const imgIn=document.createElement('input');
+    imgIn.type='text'; imgIn.placeholder='latte.jpg  or  https://…'; imgIn.value=rawPicture(p);
+    f2.appendChild(imgIn);
+    f2.appendChild(el('small',null,'Image filename (e.g. latte.jpg) or a full https:// link. Leave empty to remove.'));
+    body.appendChild(f2);
+
+    const refreshPreview=()=>preview.replaceChildren(productMedia({name:nameIn.value,payload:{menu_picture:imgIn.value}}));
+    imgIn.addEventListener('input',refreshPreview);
+    nameIn.addEventListener('input',()=>{ if(!menuPicture(imgIn.value))refreshPreview(); });
+
+    const acts=el('div','dlg-actions');
+    const save=el('button',null,'Save changes'); save.type='button';
+    const cancel=el('button','ghost','Cancel'); cancel.type='button';
+    cancel.onclick=()=>openProduct(p,false);
+    save.onclick=async()=>{
+      const name=nameIn.value.trim(), image=imgIn.value.trim();
+      if(!name)return toast('Product name is required','err');
+      if(image&&!validImageInput(image))return toast('Use a filename like latte.jpg or a full https:// link','err');
+      save.disabled=true;
+      try{
+        await request('PATCH',{id_menu:p.id_menu,name,menu_picture:image});
+        await refresh(true);
+        toast('Saved '+name,'ok');
+        const fresh=state.products.find(x=>x.id_menu===p.id_menu);
+        if(fresh)openProduct(fresh,false); else dlg.close();
+      }catch(e){toast(e.message,'err');save.disabled=false;}
+    };
+    acts.append(save,cancel);
+    body.appendChild(acts);
+  }
+  if(!dlg.open)dlg.showModal();
+}
+
+async function markSoldOut(p){
+  if(!confirm('Set stock of "'+p.name+'" to 0 (sold out)?'))return;
+  try{
+    await request('PATCH',{id_menu:p.id_menu,stock:0});
+    await refresh(true);
+    toast(p.name+' marked sold out','ok');
+  }catch(e){msg(e.message,'err');}
+}
+
 async function request(method,body){
   const r=await fetch('/api/admin',{
     method,
@@ -511,22 +674,28 @@ async function request(method,body){
     body:body?JSON.stringify(body):undefined,
     cache:'no-store'
   });
-  const data=await r.json();
-  if(!r.ok)throw Error(data.error||'Request failed');
+  // 502/504 pages and other non-JSON bodies must not crash with "Unexpected token <"
+  const data=await r.json().catch(()=>({}));
+  if(r.status===401&&!$('dashboard').hidden){
+    logout();                                   // token expired or changed
+    throw Error('Session expired. Please sign in again.');
+  }
+  if(!r.ok)throw Error(data.error||'Request failed (HTTP '+r.status+')');
   return data;
 }
 
 /* ---------- renderers ---------- */
 function renderStats(){
   const {products,orders}=state;
-  const units=products.reduce((s,p)=>s+Number(p.stock||0),0);
-  const low=products.filter(p=>level(Number(p.stock))!=='ok').length;
-  const revenue=orders.reduce((s,o)=>s+Number(o.total_cents||0),0);
+  const units=products.reduce((s,p)=>s+stockNum(p.stock),0);
+  const low=products.filter(p=>level(p.stock)!=='ok').length;
+  const counted=orders.filter(o=>!NON_REVENUE.includes(String(o.status||'').toLowerCase()));
+  const revenue=counted.reduce((s,o)=>s+Number(o.total_cents||0),0);
   const cards=[
     ['Products',products.length,'in your catalog',''],
     ['Units in stock',units.toLocaleString(),'across all products',''],
     ['Need attention',low,low?'low or out of stock':'everything looks good',low?'alert':''],
-    ['Recent revenue',money(revenue),orders.length+' latest orders','']
+    ['Recent revenue',money(revenue),counted.length+' orders (excl. cancelled)','']
   ];
   const box=$('stats'); box.replaceChildren();
   for(const [l,v,s,c] of cards){
@@ -539,9 +708,11 @@ function renderStats(){
 }
 
 function productCard(p,max){
-  const stock=Number(p.stock);
+  const stock=stockNum(p.stock);
   const lv=level(stock);
   const card=el('div','pcard');
+
+  card.appendChild(productMedia(p));
 
   const top=el('div','ptop');
   const nm=el('div');
@@ -566,7 +737,7 @@ function productCard(p,max){
   const minus=el('button',null,'−'); minus.type='button'; minus.setAttribute('aria-label','Decrease');
   const plus=el('button',null,'+'); plus.type='button'; plus.setAttribute('aria-label','Increase');
   const input=document.createElement('input');
-  input.type='number'; input.min=0; input.max=1000000; input.value=stock;
+  input.type='number'; input.min=0; input.max=MAX_STOCK; input.value=stock;
   input.setAttribute('aria-label','New stock for '+p.name);
   stepper.append(minus,input,plus);
 
@@ -577,14 +748,15 @@ function productCard(p,max){
     const changed=input.value!==''&&Number(input.value)!==stock;
     save.classList.toggle('idle',!changed);
   };
-  const bump=d=>{input.value=Math.max(0,(Number(input.value)||0)+d);sync();};
+  const bump=d=>{input.value=Math.min(MAX_STOCK,Math.max(0,(Number(input.value)||0)+d));sync();};
   minus.onclick=()=>bump(-1);
   plus.onclick=()=>bump(1);
   input.addEventListener('input',sync);
 
   save.onclick=async()=>{
     const val=Number(input.value);
-    if(input.value===''||!Number.isSafeInteger(val)||val<0)return msg('Enter a valid nonnegative stock','err');
+    if(input.value===''||!Number.isSafeInteger(val)||val<0||val>MAX_STOCK)
+      return msg('Enter a whole number between 0 and '+MAX_STOCK.toLocaleString(),'err');
     save.disabled=true;
     try{
       await request('PATCH',{id_menu:p.id_menu,stock:val});
@@ -597,14 +769,27 @@ function productCard(p,max){
 
   editor.append(stepper,save);
   card.appendChild(editor);
+
+  // actions
+  const actions=el('div','pactions');
+  const detailBtn=el('button','ghost','Details'); detailBtn.type='button';
+  detailBtn.onclick=()=>openProduct(p,false);
+  const editBtn=el('button','ghost','Edit'); editBtn.type='button';
+  editBtn.onclick=()=>openProduct(p,true);
+  const soldBtn=el('button','danger','Sold out'); soldBtn.type='button';
+  soldBtn.disabled=stock<=0;
+  soldBtn.onclick=()=>markSoldOut(p);
+  actions.append(detailBtn,editBtn,soldBtn);
+  card.appendChild(actions);
+
   return card;
 }
 
 function renderProducts(){
   const q=$('psearch').value.trim().toLowerCase();
-  const max=Math.max(20,...state.products.map(p=>Number(p.stock)||0));
+  const max=Math.max(20,...state.products.map(p=>stockNum(p.stock)));
   const list=state.products.filter(p=>{
-    const lv=level(Number(p.stock));
+    const lv=level(p.stock);
     if(pFilter==='low'&&lv!=='low')return false;
     if(pFilter==='out'&&lv!=='out')return false;
     return !q||String(p.name).toLowerCase().includes(q);
@@ -622,7 +807,8 @@ function renderProducts(){
 
 function renderOrders(){
   const q=$('osearch').value.trim().toLowerCase();
-  const list=state.orders.filter(o=>!q||[o.ref,o.name,o.phone].some(v=>String(v||'').toLowerCase().includes(q)));
+  // card search matches the last 4 characters only, never the full number
+  const list=state.orders.filter(o=>!q||[o.ref,o.name,o.phone,last4(o.card_number||o.loyalty)].some(v=>String(v||'').toLowerCase().includes(q)));
   const box=$('orders'); box.replaceChildren();
   for(const o of list){
     const card=el('div','order');
@@ -635,9 +821,9 @@ function renderOrders(){
     r1.appendChild(el('span','status '+statusClass(st),st));
     r1.appendChild(el('span','ref',o.ref));
     main.appendChild(r1);
-    main.appendChild(el('div','meta',o.phone+' · '+new Date(o.created_at).toLocaleString()));
+    main.appendChild(el('div','meta',(o.phone||'')+' · '+new Date(o.created_at).toLocaleString()));
     const items=el('div','items');
-    for(const x of o.items){
+    for(const x of (o.items||[])){
       const c=el('span','chip');
       c.appendChild(el('b',null,x.qty+'× '));
       c.appendChild(document.createTextNode(x.name));
@@ -670,16 +856,18 @@ function renderAll(){
   renderStats();renderProducts();renderOrders();
   $('tc-stock').textContent=state.products.length;
   $('tc-orders').textContent=state.orders.length;
-  const needs=state.products.filter(p=>level(Number(p.stock))!=='ok').length;
+  const needs=state.products.filter(p=>level(p.stock)!=='ok').length;
   $('tc-stock').classList.toggle('alert',needs>0);
 }
 
-function setTab(name){
+function setTab(name,focus){
   if(name!=='stock'&&name!=='orders')name='stock';
   for(const b of document.querySelectorAll('.tab')){
     const on=b.dataset.tab===name;
     b.classList.toggle('on',on);
     b.setAttribute('aria-selected',on);
+    b.tabIndex=on?0:-1;                       // roving tabindex
+    if(on&&focus)b.focus();
   }
   $('tab-stock').hidden=name!=='stock';
   $('tab-orders').hidden=name!=='orders';
@@ -689,11 +877,11 @@ function setTab(name){
 /* ---------- data flow ---------- */
 async function refresh(silent){
   const data=await request('GET');
-  state=data;
+  state={products:Array.isArray(data.products)?data.products:[],orders:Array.isArray(data.orders)?data.orders:[]};
   renderAll();
   $('auth').hidden=true;
   $('dashboard').hidden=false;
-  if(!silent)toast('Loaded '+data.products.length+' products and '+data.orders.length+' orders.','ok');
+  if(!silent)toast('Loaded '+state.products.length+' products and '+state.orders.length+' orders.','ok');
 }
 
 async function login(){
@@ -708,8 +896,12 @@ async function login(){
 }
 
 function logout(){
+  // close dialogs first so order / product data never stays on screen
+  for(const id of ['odlg','pdlg']){const d=$(id); if(d.open)d.close(); $(id+'-body').replaceChildren();}
   token=''; state={products:[],orders:[]};
   $('token').value='';
+  $('psearch').value=''; $('osearch').value='';
+  $('products').replaceChildren(); $('orders').replaceChildren(); $('stats').replaceChildren();
   $('dashboard').hidden=true; $('auth').hidden=false;
   msg('');
   $('token').focus();
@@ -722,10 +914,25 @@ $('refresh').onclick=async()=>{
   try{await refresh(false);}catch(e){msg(e.message,'err');}
 };
 $('logout').onclick=logout;
-$('odlg-close').onclick=()=>$('odlg').close();
-$('odlg').addEventListener('click',e=>{ if(e.target===$('odlg'))$('odlg').close(); }); // click backdrop to close
+for(const [dlgId,closeId] of [['odlg','odlg-close'],['pdlg','pdlg-close']]){
+  $(closeId).onclick=()=>$(dlgId).close();
+  $(dlgId).addEventListener('click',e=>{ if(e.target===$(dlgId))$(dlgId).close(); }); // click backdrop to close
+}
 document.querySelector('.tabs').addEventListener('click',e=>{
   const b=e.target.closest('.tab'); if(b)setTab(b.dataset.tab);
+});
+// keyboard: arrow keys, Home and End move between tabs
+document.querySelector('.tabs').addEventListener('keydown',e=>{
+  const names=['stock','orders'];
+  const cur=names.indexOf(document.querySelector('.tab.on').dataset.tab);
+  let next=null;
+  if(e.key==='ArrowRight')next=(cur+1)%names.length;
+  else if(e.key==='ArrowLeft')next=(cur-1+names.length)%names.length;
+  else if(e.key==='Home')next=0;
+  else if(e.key==='End')next=names.length-1;
+  if(next===null)return;
+  e.preventDefault();
+  setTab(names[next],true);
 });
 setTab(location.hash.replace('#',''));
 $('psearch').addEventListener('input',renderProducts);
