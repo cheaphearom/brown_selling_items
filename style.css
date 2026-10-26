@@ -116,5 +116,15 @@
 .ticket .summary-row{margin:8px 0}.ticket .total-row{margin-bottom:0}
 .ticket-hold{display:flex;align-items:center;gap:8px;background:#fff7e0;border-radius:10px;padding:8px 10px;font-size:12px;color:#6b5210;margin:0 0 6px}
 
-@media(max-width:600px){.modal{padding:0;align-items:flex-end}.modal-box{max-width:none;height:min(92vh,780px);border-radius:24px 24px 0 0}}
-@media(max-width:1050px){.menu-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:800px){.menu-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:450px){.menu-grid{grid-template-columns:1fr}.menu-app{padding:16px 10px 90px}}
+@media(max-width:1050px){.menu-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:800px){.menu-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:450px){
+  .menu-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .menu-app{padding:16px 10px 90px}
+  .menu-photo{height:120px}
+  .menu-card-content{padding:10px}
+  .menu-card-name{font-size:13px;min-height:38px}
+  .menu-card-bottom{flex-wrap:wrap;gap:6px}
+  .menu-price{font-size:15px}
+  .menu-action{font-size:10px;padding:6px 9px}
+}

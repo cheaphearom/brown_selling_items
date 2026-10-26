@@ -1,15 +1,20 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https: data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
 <title>BROWN Shop</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo.png">
 <link rel="stylesheet" href="style.css">
 </head><body style="margin:0">
 <div class="menu-app"><div class="menu-container">
   <div id="menu-error" class="menu-alert" style="display:none"></div>
-  <div class="menu-title"><h1>Menu Listing</h1>
+  <div class="menu-title">
+    <h1 style="display:flex;align-items:center;gap:10px;margin:0">
+      <img style="height: 36px;width: auto;display: block;" src="img/logo.png" alt="BROWN Shop" class="site-logo">
+      Menu Listing
+    </h1>
     <span style="display:flex;gap:10px;align-items:center"><span class="menu-muted" id="menu-count">Loading…</span><button type="button" class="top-btn" id="btnMyOrders">My orders<span class="count-badge" id="ordersCount" hidden>0</span></button></span></div>
   <div id="menu-root"><div class="menu-loading"><div class="spinner"></div><p>Loading menu…</p></div></div>
 </div></div>

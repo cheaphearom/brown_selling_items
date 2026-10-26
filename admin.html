@@ -3,7 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
 <title>BROWN Shop — Inventory</title>
+<link rel="icon" type="image/png" href="img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#f6f1e8;
@@ -334,7 +338,8 @@
 <!-- ============ LOGIN ============ -->
 <section id="auth">
   <div class="hero">
-    <div class="logo" aria-hidden="true">B</div>
+    <!-- <div class="logo" aria-hidden="true">B</div> -->
+     <img style="height: 100px;width: auto;display: block;" src="img/logo.png" alt="BROWN Shop" class="logo">
     <h1>BROWN <em>Shop</em></h1>
     <p>Manage your stock and keep an eye on the latest orders, all in one place.</p>
     <div class="login">
@@ -354,7 +359,8 @@
   <header class="topbar">
     <div class="wrap">
       <div class="tb-brand">
-        <div class="tb-logo" aria-hidden="true">B</div>
+        <!-- <div class="tb-logo" aria-hidden="true">B</div> -->
+        <img style="width: auto;display: block;" src="img/logo.png" alt="BROWN Shop" class="tb-logo">
         <div class="tb-title">BROWN Shop<small>Inventory &amp; Orders</small></div>
       </div>
       <div class="tb-actions">
@@ -954,7 +960,7 @@ function exportOrders(){
       ((Number(o.total_cents)||0)/100).toFixed(2)    // plain number so Excel can sum it
     ]);
   }
-  downloadCSV('orders-'+today()+'.csv',rows);
+  downloadCSV('brown-orders-'+today()+'.csv',rows);
   toast('Exported '+list.length+' orders','ok');
 }
 function exportStock(){
@@ -965,7 +971,7 @@ function exportStock(){
     const lv=level(p.stock);
     rows.push([p.id_menu,p.name,stockNum(p.stock),lv==='out'?'Out of stock':lv==='low'?'Low stock':'In stock']);
   }
-  downloadCSV('stock-'+today()+'.csv',rows);
+  downloadCSV('brown-stock-'+today()+'.csv',rows);
   toast('Exported '+list.length+' products','ok');
 }
 
