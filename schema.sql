@@ -15,3 +15,8 @@ CREATE TABLE IF NOT EXISTS shop_orders (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_shop_orders_date ON shop_orders(created_at DESC);
+
+-- Run these statements even when shop_orders already exists.
+ALTER TABLE shop_orders ADD COLUMN IF NOT EXISTS loyalty_key TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS shop_orders_loyalty_key_unique
+  ON shop_orders (loyalty_key) WHERE loyalty_key IS NOT NULL;

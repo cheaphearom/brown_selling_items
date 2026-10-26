@@ -33,3 +33,13 @@ This version replaces browser-only order storage with PostgreSQL-backed Vercel A
 - The `MAX_ORDER_QTY` limit is 2, enforced both client- and server-side.
 - Use HTTPS and configure suitable rate limiting / bot protection for public commerce. This example should be hardened (staff auth, server-side customer verification, payment handling, availability monitoring, audit logs) before real retail production use.
 - The original `data.json` is still deployed as a reference but is **not** the live stock source.
+
+## One product / card + serial duplicate protection
+- Each order must contain **one product, quantity 1**, plus a card number and serial number.
+- `POST /api/loyalty` checks whether the combination was used before; `POST /api/orders` enforces the rule again.
+- Run the updated `schema.sql` on your **existing** Neon database to add `loyalty_key` and its unique index; `CREATE TABLE IF NOT EXISTS` by itself would not add the column.
+- Generate `LOYALTY_HASH_SECRET` using `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` and configure it **both in local .env and in Vercel Environment Variables**. Keep it unchanged after use. This server-only secret HMAC-hashes the card/serial combination; the raw serial is never stored.
+- Existing orders placed before the migration have no card+serial keys; historical duplicate detection is therefore unavailable for them.
+- **This checks prior use, not whether a card/serial pair is genuine.** Genuine validation requires a private loyalty database or authenticated BROWN loyalty API.
+- Add production rate limiting / bot protection to `/api/loyalty` and `/api/orders`, since the former can be queried by anyone.
+- A successfully placed order consumes that card/serial pair permanently in this version, even if later cancelled.

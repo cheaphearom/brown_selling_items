@@ -2,7 +2,7 @@
 // =====================================================================
 // CONFIG — everything in this file is visible to anyone who opens the page.
 // Products and orders come from the server API. Order history is also cached in this browser.
-// Loyalty verification is disabled pending a secure server-side integration.
+// Loyalty card + serial reuse is checked server-side; authenticity requires an external loyalty service.
 // =====================================================================
 const DATA_URL = '/api/menu';
 const SHOP_NAME = 'BROWN';
@@ -12,7 +12,7 @@ const SHOP_WHATSAPP = '';
 const MENU_IMAGE_BASE = 'https://www.browncoffee.com.kh/uploads/ximg/item_menus/';
 const HIDDEN_STATUSES = [0];            // menu `status` values to hide (0 = test/inactive, 3 = live)
 const ORDER_TTL_MS = 7 * 24 * 3600 * 1000;   // orders kept on this device for 7 days
-const MAX_ORDER_QTY = 2;                // 1 or 2 items per order
+const MAX_ORDER_QTY = 1;                // exactly one product, quantity one, per order
 const MODAL_CLOSE_MS = 280;             // must match the slideDown / fadeOut time in the CSS
 
 // =====================================================================
@@ -151,7 +151,7 @@ function menuRows(json) {
   }
   return rows;
 }
-const loyaltyCards = () => []; // Loyalty lookup disabled until a secure server-side verification API is configured.
+
 
 // Flat rows -> groups[].categories[].items[]
 function buildGroups(rows) {
@@ -238,7 +238,7 @@ function renderPage(i) {
 }
 
 // =====================================================================
-// 2. Cart  (stores only item key + qty; prices always come from data.json)
+// 2. Cart  (stores only item key + qty; prices always come from the live menu API)
 // =====================================================================
 let cart = store.get('brown_cart', []).filter(l => l && typeof l.k === 'string' && l.q > 0);
 const saveCart = () => { store.set('brown_cart', cart); updateFab(); };
@@ -326,7 +326,7 @@ function renderCart() {
       <div class="qty-buttons"><button type="button" data-dec="${esc(l.k)}">−</button><strong>${l.q}</strong><button type="button" data-inc="${esc(l.k)}">+</button></div></div>`;
   }).join('') + `
     <div class="total-row"><span>Total</span><span>${money(cartCents() / 100)}</span></div>
-    <p class="checkout-info" style="margin-top:0">Up to ${MAX_ORDER_QTY} items per order.</p>
+    <p class="checkout-info" style="margin-top:0">One item per order.</p>
     <div class="btn-row"><button type="button" class="btn btn-ghost" id="bMore">Add more</button><button type="button" class="btn btn-primary" id="bNext">Continue →</button></div>`;
   body.onclick = (ev) => {
     const t = ev.target, rm = t.dataset.rm, dec = t.dataset.dec, inc = t.dataset.inc;
@@ -342,16 +342,16 @@ function renderCart() {
   $('bNext').onclick = renderDetails;
 }
 
-// ---- step 2: details + loyalty card (checked against data.json) ----
+// ---- step 2: details + loyalty card (checked for previous use through the API) ----
 function renderDetails() {
   setHead('Your details', STEPS, 2); body.onclick = null;
   const L = flow.loyalty;
   body.innerHTML = `
     <label class="field"><span>Name *</span><input id="fName" maxlength="60" autocomplete="name" value="${esc(flow.details.name)}"></label>
     <label class="field"><span>Phone *</span><input id="fPhone" type="tel" maxlength="20" autocomplete="tel" value="${esc(flow.details.phone)}"></label>
-    <div id="lyBox" style="display:none">${L ? loyaltyOk(L) : `
-      <label class="field"><span>Card number</span><input id="lyCard" inputmode="numeric" maxlength="32" autocomplete="off" spellcheck="false"></label>
-      <label class="field"><span>Serial number</span><input id="lySerial" type="password" maxlength="32" autocomplete="off" spellcheck="false"></label>
+    <div id="lyBox">${L ? loyaltyOk(L) : `
+      <label class="field"><span>Card number *</span><input id="lyCard" inputmode="numeric" maxlength="32" autocomplete="off" spellcheck="false"></label>
+      <label class="field"><span>Serial number *</span><input id="lySerial" type="password" maxlength="32" autocomplete="off" spellcheck="false"></label>
       <button type="button" class="btn btn-ghost" id="lyBtn" style="width:100%">Verify card</button>`}</div>
     <div class="btn-row"><button type="button" class="btn btn-ghost" id="bBack">← Back</button><button type="button" class="btn btn-primary" id="bPlace">Place order</button></div>`;
   $('bBack').onclick = () => { keepDetails(); renderCart(); };
@@ -375,19 +375,19 @@ async function verifyLoyalty() {
   if (card.length < 4 || serial.length < 2) return showAlert('Card details needed', 'Enter both the card number and the serial number.', 'info');
   btn.disabled = true; showLoading('Verifying card…');
   try {
-    const cards = loyaltyCards(await fetchData());
-    const m = cards.find(c => String(c.card_number) === card && String(c.serial_number) === serial);
-    if (!m) throw new Error('invalid');
+    const response = await fetch('/api/loyalty', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({card_number: card, serial_number: serial}) });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Could not check card details.');
     limiter.reset('loyalty');
     keepDetails();
-    flow.loyalty = { masked: '•••• ' + card.slice(-4), name: m.name || '', points: m.points };
+    flow.loyalty = { masked: '•••• ' + card.slice(-4), card, serial };
     renderDetails();
   } catch (e) {
     if (e instanceof TypeError) {
       showAlert('Connection problem', friendlyError(e), 'error');
     } else {
       limiter.fail('loyalty', 5, 300);
-      showAlert('Card not verified', 'Card number and serial number do not match.', 'error');   // same message for every failure
+      showAlert('Card unavailable', e.message || 'Could not check card details.', 'error');
     }
     btn.disabled = false;
   } finally { hideLoading(); }
@@ -412,6 +412,8 @@ async function placeOrder() {
   if (!cart.length) return showAlert('Cart is empty', 'Add an item to your cart first.', 'info');
   if (!flow.details.name) return showAlert('Name needed', 'Please enter your name.', 'info');
   if (!flow.details.phone) return showAlert('Phone number needed', 'Please enter your phone number.', 'info');
+  if (!flow.loyalty) return showAlert('Verify card first', 'Enter and check your card number and serial number before ordering.', 'info');
+  if (cart.length !== 1 || cart[0].q !== 1) return showAlert('One product only', 'Each order must contain exactly one product, quantity one.', 'info');
   const lines = cart.filter(l => lookup[l.k]).map(l => {
     const it = lookup[l.k].item, unit = finalPrice(it);
     return { id_menu: String(it.item_id), name: it.item_name, qty: l.q, unit, total: Math.round(unit * 100) * l.q / 100 };
@@ -429,7 +431,7 @@ async function placeOrder() {
   try {
     const res = await fetch('/api/orders', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ref: o.ref, name: o.name, phone: o.phone, loyalty: o.loyalty,
+      body: JSON.stringify({ ref: o.ref, name: o.name, phone: o.phone, card_number: flow.loyalty.card, serial_number: flow.loyalty.serial,
         items: lines.map(x => ({ id_menu: x.id_menu, qty: x.qty })) })
     });
     const result = await res.json();
