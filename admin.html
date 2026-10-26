@@ -217,6 +217,32 @@
   }
   .empty big{display:block; font-size:34px; margin-bottom:6px}
 
+  /* ---------- Tabs ---------- */
+  .tabs{
+    display:inline-flex; gap:6px; margin-top:30px; padding:5px;
+    background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow);
+  }
+  .tab{
+    display:flex; align-items:center; gap:9px; padding:11px 22px; border-radius:12px;
+    background:transparent; color:var(--muted); box-shadow:none; font-size:15px; font-weight:700;
+  }
+  .tab:hover{transform:none; filter:none; color:var(--ink); background:var(--surface-2)}
+  .tab.on{
+    background:linear-gradient(135deg,var(--brand-2),var(--brand)); color:#fff;
+    box-shadow:0 4px 14px rgba(59,39,24,.25);
+  }
+  @media (prefers-color-scheme:dark){ .tab.on{color:#1b1209} }
+  .tab .count{
+    min-width:24px; padding:1px 8px; border-radius:99px; font-size:12px; font-weight:800; text-align:center;
+    background:var(--accent-soft); color:var(--brand-2);
+  }
+  .tab.on .count{background:rgba(255,255,255,.22); color:inherit}
+  .tab .count.alert{background:var(--bad-bg); color:var(--bad)}
+  .tabpanel.section{margin-top:22px; animation:in .25s ease}
+  @media (max-width:560px){
+    .tabs{display:flex} .tab{flex:1; justify-content:center; padding:11px 10px}
+  }
+
   /* ---------- Toast ---------- */
   #toasts{position:fixed; right:18px; bottom:18px; z-index:50; display:grid; gap:10px; max-width:min(380px,calc(100vw - 36px))}
   .toast{
@@ -281,7 +307,16 @@
   <main class="wrap">
     <div class="stats" id="stats"></div>
 
-    <section class="section">
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button class="tab on" id="tabbtn-stock" data-tab="stock" role="tab" aria-selected="true" aria-controls="tab-stock">
+        📦 Stock <span class="count" id="tc-stock">0</span>
+      </button>
+      <button class="tab" id="tabbtn-orders" data-tab="orders" role="tab" aria-selected="false" aria-controls="tab-orders">
+        🧾 Orders <span class="count" id="tc-orders">0</span>
+      </button>
+    </nav>
+
+    <section class="section tabpanel" id="tab-stock" role="tabpanel" aria-labelledby="tabbtn-stock">
       <div class="section-head">
         <h2>Product stock<span id="pcount"></span></h2>
         <div class="tools">
@@ -296,7 +331,7 @@
       <div id="products" class="grid"></div>
     </section>
 
-    <section class="section">
+    <section class="section tabpanel" id="tab-orders" role="tabpanel" aria-labelledby="tabbtn-orders" hidden>
       <div class="section-head">
         <h2>Latest 100 orders<span id="ocount"></span></h2>
         <div class="tools">
@@ -494,7 +529,25 @@ function renderOrders(){
   $('ocount').textContent=state.orders.length+' orders';
 }
 
-function renderAll(){renderStats();renderProducts();renderOrders();}
+function renderAll(){
+  renderStats();renderProducts();renderOrders();
+  $('tc-stock').textContent=state.products.length;
+  $('tc-orders').textContent=state.orders.length;
+  const needs=state.products.filter(p=>level(Number(p.stock))!=='ok').length;
+  $('tc-stock').classList.toggle('alert',needs>0);
+}
+
+function setTab(name){
+  if(name!=='stock'&&name!=='orders')name='stock';
+  for(const b of document.querySelectorAll('.tab')){
+    const on=b.dataset.tab===name;
+    b.classList.toggle('on',on);
+    b.setAttribute('aria-selected',on);
+  }
+  $('tab-stock').hidden=name!=='stock';
+  $('tab-orders').hidden=name!=='orders';
+  try{history.replaceState(null,'','#'+name);}catch(e){}
+}
 
 /* ---------- data flow ---------- */
 async function refresh(silent){
@@ -532,6 +585,10 @@ $('refresh').onclick=async()=>{
   try{await refresh(false);}catch(e){msg(e.message,'err');}
 };
 $('logout').onclick=logout;
+document.querySelector('.tabs').addEventListener('click',e=>{
+  const b=e.target.closest('.tab'); if(b)setTab(b.dataset.tab);
+});
+setTab(location.hash.replace('#',''));
 $('psearch').addEventListener('input',renderProducts);
 $('osearch').addEventListener('input',renderOrders);
 $('pfilter').addEventListener('click',e=>{
