@@ -274,7 +274,7 @@ module.exports = async (req, res) => {
         JSON.stringify(lines),
         totalCents,
         loyaltyKey,
-        'PLACED'
+        'placed'
       ]
     );
 
@@ -344,6 +344,7 @@ function format(row) {
     name: row.customer_name,
     phone: row.phone,
     loyalty: row.loyalty,
+    card_number: row.card_number,
     items: row.items,
     total: row.total_cents / 100
   };

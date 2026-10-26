@@ -5,7 +5,7 @@
 // Loyalty card + serial reuse is checked server-side; authenticity requires an external loyalty service.
 // =====================================================================
 const DATA_URL = '/api/menu';
-const SHOP_NAME = 'BROWN';
+const SHOP_NAME = 'BROWN SHOP';
 // Optional: put the shop's WhatsApp number (digits only, with country code, e.g. '855123456789').
 // When set, the customer gets a button that sends the order to the shop. Leave '' to hide it.
 const SHOP_WHATSAPP = '';
@@ -103,7 +103,7 @@ function friendlyError(e) {
 }
 
 // =====================================================================
-// 1. Menu — read from data.json
+// 1. Menu — read from the menu API
 // =====================================================================
 const lookup = {};
 let menuPages = [], currentPage = 0;
@@ -133,9 +133,9 @@ function menuPicture(p) {
 async function fetchData() {
   if (DATA) return DATA;
   const res = await fetch(DATA_URL, { cache: 'no-store' });
-  if (!res.ok) throw new Error('Could not read data.json (HTTP ' + res.status + ').');
+  if (!res.ok) throw new Error('Could not read the menu (HTTP ' + res.status + ').');
   let json;
-  try { json = await res.json(); } catch (e) { throw new Error('data.json is not valid JSON.'); }
+  try { json = await res.json(); } catch (e) { throw new Error('The menu response is not valid JSON.'); }
   DATA = json;
   return DATA;
 }
@@ -318,7 +318,7 @@ function renderCart() {
       <div class="btn-row"><button type="button" class="btn btn-ghost" id="bClose">Close</button></div>`;
     $('bClose').onclick = closeModal; return;
   }
-  body.innerHTML = cart.map(l => {
+  body.innerHTML = cart.filter(l => lookup[l.k]).map(l => {
     const e = lookup[l.k];
     return `<div class="cart-line"><div class="menu-photo">${photo(e.item)}</div>
       <div class="grow"><strong>${esc(e.item.item_name)}</strong><div style="font-size:14px">${priceHtml(e.item)}</div>
@@ -414,9 +414,17 @@ async function placeOrder() {
   if (!flow.details.phone) return showAlert('Phone number needed', 'Please enter your phone number.', 'info');
   if (!flow.loyalty) return showAlert('Verify card first', 'Enter and check your card number and serial number before ordering.', 'info');
   if (cart.length !== 1 || cart[0].q !== 1) return showAlert('One product only', 'Each order must contain exactly one product, quantity one.', 'info');
+  // Each line keeps the full price, discount percent, price after discount and amount saved (used on the receipt).
   const lines = cart.filter(l => lookup[l.k]).map(l => {
-    const it = lookup[l.k].item, unit = finalPrice(it);
-    return { id_menu: String(it.item_id), name: it.item_name, qty: l.q, unit, total: Math.round(unit * 100) * l.q / 100 };
+    const e = lookup[l.k], it = e.item, unit = finalPrice(it);
+    const price = parseFloat(it.price) || 0;
+    return {
+      id_menu: String(it.item_id), name: it.item_name,
+      group: e.group, category: e.category,
+      qty: l.q, price, discount: discOf(it), unit,
+      total: Math.round(unit * 100) * l.q / 100,
+      saved: Math.round((price - unit) * 100) * l.q / 100
+    };
   });
   if (!lines.length) return showAlert('Cart is empty', 'Add an item to your cart first.', 'info');
   const total = lines.reduce((s, x) => s + Math.round(x.total * 100), 0) / 100;
@@ -427,7 +435,8 @@ async function placeOrder() {
   };
   const btn = $('bPlace');
   if (btn) btn.disabled = true;
-  showLoading('Saving order and updating stock…');
+  showLoading('Saving order…');
+  const cardNo = flow.loyalty.card;
   try {
     const res = await fetch('/api/orders', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -436,10 +445,15 @@ async function placeOrder() {
     });
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || 'Could not place order.');
-    orders.add(result.order);
+    // Keep the extra price details from this page, on top of what the server returned.
+    const order = { ...result.order, card_number: result.order.card_number || cardNo, items: (result.order.items || lines).map((it, idx) => {
+      const l = lines.find(x => x.id_menu === String(it.id_menu)) || lines[idx] || {};
+      return { ...it, group: l.group, category: l.category, price: l.price, discount: l.discount, unit: l.unit, saved: l.saved };
+    }) };
+    orders.add(order);
     cart = []; saveCart(); flow.loyalty = null;
     DATA = null;
-    renderDone(result.order);
+    renderDone(order);
     loadMenu();
   } catch (err) {
     showAlert('Order not placed', friendlyError(err));
@@ -460,14 +474,11 @@ function renderDone(o) {
   setHead('Order saved', STEPS, 4); body.onclick = null; openModal();
   body.innerHTML = `
     <div class="success"><div class="success-check">✓</div><h3>Order placed!</h3><p>Your order was saved by the shop. A copy is also kept on this device.</p></div>
-    <div class="ticket">
-      <div class="ticket-top"><div><span>Order</span><strong>${esc(shortRef(o.ref))}</strong></div></div>
-      ${o.items.map(i => `<div class="summary-row"><span>${esc(i.qty)} × ${esc(i.name)}</span><span>${money(i.total)}</span></div>`).join('')}
-      <div class="total-row"><span>Total</span><span>${money(o.total)}</span></div>
-    </div>
+    <div class="rcpt">${receiptInner(o)}</div>
+    <div style="height:12px"></div>
     ${waButton(o)}
-    <div class="btn-row"><button type="button" class="btn btn-ghost" id="bTrack">View order</button><button type="button" class="btn btn-primary" id="bReceipt">Download receipt</button></div>`;
-  $('bTrack').onclick = () => renderOrderDetail(o);
+    <div class="btn-row"><button type="button" class="btn btn-ghost" id="bClose3">Close</button><button type="button" class="btn btn-primary" id="bReceipt">Download receipt</button></div>`;
+  $('bClose3').onclick = closeModal;
   $('bReceipt').onclick = () => downloadReceipt(o);
 }
 
@@ -475,7 +486,7 @@ function renderDone(o) {
 // 4. My orders (saved on this device only)
 // =====================================================================
 function renderMyOrders() {
-  const list = orders.all();
+  const list = orders.all();  
   setHead(list.length ? `My orders (${list.length})` : 'My orders'); openModal();
   body.innerHTML = `
     ${list.length ? list.map(o => `<button type="button" class="order-row" data-ref="${esc(o.ref)}"><span><strong>${esc(shortRef(o.ref))}</strong><br><small style="color:#a39a8b">${esc(new Date(o.at).toLocaleString())}</small></span><span class="menu-price" style="color:#b8860b">${money(o.total)}</span></button>`).join('')
@@ -489,16 +500,12 @@ function renderMyOrders() {
   $('bClose2').onclick = closeModal;
 }
 
+// Order detail now shows the same receipt as the downloaded file.
 function renderOrderDetail(o) {
   setHead('Order ' + shortRef(o.ref)); body.onclick = null; openModal();
   body.innerHTML = `
-    <div class="summary-row"><span>Placed</span><span>${esc(new Date(o.at).toLocaleString())}</span></div>
-    <div class="summary-row"><span>Name</span><span>${esc(o.name)}</span></div>
-    ${o.phone ? `<div class="summary-row"><span>Phone</span><span>${esc(o.phone)}</span></div>` : ''}
-    ${o.loyalty ? `<div class="summary-row"><span>Loyalty card</span><span>${esc(o.loyalty)}</span></div>` : ''}
-    <h4>Items</h4>
-    ${o.items.map(i => `<div class="summary-row"><span>${esc(i.qty)} × ${esc(i.name)}</span><span>${money(i.total)}</span></div>`).join('')}
-    <div class="total-row"><span>Total</span><span>${money(o.total)}</span></div>
+    <div class="rcpt">${receiptInner(o)}</div>
+    <div style="height:12px"></div>
     ${waButton(o)}
     <div class="btn-row"><button type="button" class="btn btn-ghost" id="bBackList">← My orders</button>
       <button type="button" class="btn btn-primary" id="bReceipt">Download receipt</button></div>`;
@@ -507,26 +514,116 @@ function renderOrderDetail(o) {
 }
 
 // =====================================================================
-// 5. Receipt download — an HTML file built in the browser
+// 5. Receipt — ONE layout shared by the website view and the PDF download
 // =====================================================================
-function receiptHtml(o) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Receipt ${esc(shortRef(o.ref))}</title>
-<style>body{font-family:Arial,Helvetica,sans-serif;max-width:420px;margin:30px auto;padding:0 16px;color:#3d2b22}
-h1{margin:0 0 4px;font-size:22px}.m{color:#7a6a58;font-size:13px;margin:2px 0}
-table{width:100%;border-collapse:collapse;margin:16px 0}td{padding:6px 0;border-bottom:1px dashed #d9cdb8;font-size:14px}td:last-child{text-align:right}
-.t td{font-weight:700;font-size:16px;border-bottom:0}</style></head><body>
-<h1>${esc(SHOP_NAME)}</h1><p class="m">Order ${esc(shortRef(o.ref))}</p><p class="m">${esc(new Date(o.at).toLocaleString())}</p>
-<p class="m">Customer: ${esc(o.name)}${o.phone ? ' · ' + esc(o.phone) : ''}</p>${o.loyalty ? `<p class="m">Loyalty card: ${esc(o.loyalty)}</p>` : ''}
-<table>${o.items.map(i => `<tr><td>${esc(i.qty)} × ${esc(i.name)}</td><td>${money(i.total)}</td></tr>`).join('')}
-<tr class="t"><td>Total</td><td>${money(o.total)}</td></tr></table>
-<p class="m">Thank you!</p></body></html>`;
+// Scoped under .rcpt so it can be used in the page AND in the downloaded file
+const RECEIPT_CSS = `
+.rcpt{font-family:Arial,Helvetica,sans-serif;max-width:420px;margin:0 auto;color:#3d2b22;font-size:14px;background:#fff;border-radius:14px;padding:18px 16px}
+.rcpt *{box-sizing:border-box}
+.rcpt .head{text-align:center;border-bottom:2px dashed #d9cdb8;padding-bottom:14px;margin-bottom:14px}
+.rcpt .head img{height:56px;width:auto;display:block;margin:0 auto 8px}
+.rcpt h1{margin:0;font-size:22px;letter-spacing:.04em;color:#3d2b22}
+.rcpt .sub{color:#7a6a58;font-size:12px;margin:2px 0}
+.rcpt .box{background:#faf6ef;border-radius:10px;padding:10px 12px;margin:0 0 14px}
+.rcpt .row{display:flex;justify-content:space-between;gap:12px;margin:4px 0}
+.rcpt .row span:first-child{color:#7a6a58}
+.rcpt .row span:last-child{text-align:right;font-weight:600;word-break:break-all}
+.rcpt .item{border-bottom:1px dashed #d9cdb8;padding:10px 0}
+.rcpt .item .sub{margin:0 0 6px}
+.rcpt .sum{margin-top:8px}
+.rcpt .grand{font-size:17px;border-top:2px solid #3d2b22;padding-top:10px;margin-top:8px}
+.rcpt .grand span:first-child{color:#3d2b22}
+.rcpt .saved{text-align:center;color:#1a683c;background:#dff5e6;border-radius:8px;padding:6px;font-weight:700;margin:10px 0 0}
+.rcpt .ref{font-family:monospace;font-size:11px;color:#7a6a58;word-break:break-all;text-align:center;margin:14px 0 4px}
+.rcpt .foot{text-align:center;color:#7a6a58;font-size:12px;margin-top:16px;border-top:2px dashed #d9cdb8;padding-top:14px}
+`;
+// inject once so the in-page receipt is styled
+(() => { const s = document.createElement('style'); s.textContent = RECEIPT_CSS; document.head.appendChild(s); })();
+
+// The receipt itself (no <html>/<body>) – used by the page and the download
+function receiptInner(o) {
+  const d = new Date(o.at);
+  const date = d.toLocaleDateString(), time = d.toLocaleTimeString();
+  const logo = location.origin + '/img/logo.png';          // the downloaded file needs a full URL
+  const unit = (i) => i.unit !== undefined ? i.unit : (Number(i.total) || 0) / (Number(i.qty) || 1);
+  const priceOf = (i) => i.price !== undefined ? i.price : unit(i);
+  const fullCents = o.items.reduce((s, i) => s + Math.round(priceOf(i) * 100) * (Number(i.qty) || 0), 0);
+  const savedCents = Math.max(0, fullCents - Math.round(o.total * 100));  
+  return `
+<div class="head">
+  <img src="${esc(logo)}" alt="" onerror="this.style.display='none'">
+  <h1>${esc(SHOP_NAME)}</h1>
+  <p class="sub">Order receipt</p>
+</div>
+<div class="box">
+  <div class="row"><span>Order</span><span>${esc(shortRef(o.ref))}</span></div>
+  <div class="row"><span>Date</span><span>${esc(date)}</span></div>
+  <div class="row"><span>Time</span><span>${esc(time)}</span></div>
+  ${o.status ? `<div class="row"><span>Status</span><span>${esc(o.status)}</span></div>` : ''}
+</div>
+<div class="box">
+  <div class="row"><span>Customer</span><span>${esc(o.name)}</span></div>
+  ${o.phone ? `<div class="row"><span>Phone</span><span>${esc(o.phone)}</span></div>` : ''}
+  ${(o.card_number || o.loyalty) ? `<div class="row"><span>Card number</span><span>${esc(o.card_number || o.loyalty)}</span></div>` : ''}
+</div>
+${o.items.map(i => `
+<div class="item">
+  <div class="row"><span style="color:inherit;font-weight:700">${esc(i.name)}</span><span>${money(i.total)}</span></div>
+  ${i.category ? `<div class="sub">${esc(i.group || '')}${i.group ? ' / ' : ''}${esc(i.category)}</div>` : ''}
+  <div class="row"><span>Full price</span><span>${money(priceOf(i))}</span></div>
+  ${i.discount > 0 ? `<div class="row"><span>Discount (${esc(i.discount)}%)</span><span>-${money(priceOf(i) - unit(i))}</span></div>` : ''}
+  <div class="row"><span>Price after discount</span><span>${money(unit(i))}</span></div>
+  <div class="row"><span>Quantity</span><span>${esc(i.qty)}</span></div>
+</div>`).join('')}
+<div class="sum">
+  <div class="row"><span>Full price total</span><span>${money(fullCents / 100)}</span></div>
+  <div class="row"><span>Total discount</span><span>-${money(savedCents / 100)}</span></div>
+  <div class="row grand"><span>TOTAL (USD)</span><span>${money(o.total)}</span></div>
+  ${savedCents > 0 ? `<p class="saved">You saved ${money(savedCents / 100)}</p>` : ''}
+</div>
+<p class="ref">Ref: ${esc(o.ref)}</p>
+<div class="foot">Thank you for your order!<br>Please keep this receipt as proof of purchase.</div>`;
 }
-function downloadReceipt(o) {
+
+// ---- PDF download: the same receipt (receiptInner + RECEIPT_CSS) is rendered off-screen and saved as a PDF ----
+let pdfLibPromise = null;
+function loadPdfLib() {
+  if (window.html2pdf) return Promise.resolve();
+  if (!pdfLibPromise) pdfLibPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'js/html2pdf.bundle.min.js';
+    s.onload = resolve;
+    s.onerror = () => { pdfLibPromise = null; reject(new Error('Could not load the PDF tool. Check your connection.')); };
+    document.head.appendChild(s);
+  });
+  return pdfLibPromise;
+}
+
+async function downloadReceipt(o) {
+  showLoading('Preparing PDF…');
+  // Render the same receipt off-screen, then turn it into a PDF
+  const holder = document.createElement('div');
+  holder.style.cssText = 'position:fixed;left:-10000px;top:0;width:420px;background:#fff';
+  holder.innerHTML = `<div class="rcpt">${receiptInner(o)}</div>`;
+  document.body.appendChild(holder);
   try {
-    const url = URL.createObjectURL(new Blob([receiptHtml(o)], { type: 'text/html' }));
-    const a = document.createElement('a'); a.href = url; a.download = 'receipt-' + String(o.ref).replace(/[^\w.-]/g, '_') + '.html';
-    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-  } catch (e) { showAlert('Download failed', 'Could not download the receipt. Please try again.', 'error'); }
+    await loadPdfLib();
+    // wait for the logo so it appears in the PDF
+    await Promise.all([...holder.querySelectorAll('img')].map(im =>
+      im.complete ? null : new Promise(r => { im.onload = im.onerror = r; })));
+    await html2pdf().set({
+      margin: 8,
+      filename: 'receipt-' + shortRef(o.ref).replace('#', '') + '.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a5', orientation: 'portrait' }
+    }).from(holder.firstElementChild).save();
+  } catch (e) {
+    showAlert('Download failed', (e && e.message) || 'Could not create the PDF. Please try again.', 'error');
+  } finally {
+    holder.remove();
+    hideLoading();
+  }
 }
 
 // =====================================================================
