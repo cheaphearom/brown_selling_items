@@ -243,6 +243,47 @@
     .tabs{display:flex} .tab{flex:1; justify-content:center; padding:11px 10px}
   }
 
+  /* ---------- Order actions ---------- */
+  .o-actions{
+    grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px;
+    padding-top:14px; border-top:1px dashed var(--line);
+  }
+  .o-actions button{padding:9px 14px; font-size:14px}
+  .status-edit{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  select{
+    font:inherit; font-weight:600; padding:9px 12px; border-radius:12px; text-transform:capitalize;
+    border:1px solid var(--line-strong); background:var(--surface-2); color:var(--ink); cursor:pointer;
+  }
+  select:focus-visible{outline:none; border-color:var(--accent); box-shadow:0 0 0 4px rgba(201,130,64,.25)}
+  .status-edit .save.idle{background:var(--surface-2); color:var(--muted); box-shadow:none; border-color:var(--line)}
+  .status-edit .save.idle:hover{transform:none; filter:none}
+
+  /* ---------- Order detail dialog ---------- */
+  dialog{
+    width:calc(100% - 28px); max-width:580px; max-height:calc(100vh - 40px); padding:0; border:1px solid var(--line);
+    border-radius:22px; background:var(--surface); color:var(--ink); box-shadow:0 30px 80px rgba(0,0,0,.4);
+    overflow:auto; margin:auto;
+  }
+  dialog[open]{animation:in .22s ease}
+  dialog::backdrop{background:rgba(20,12,6,.55); backdrop-filter:blur(4px)}
+  .dlg-head{
+    display:flex; align-items:center; justify-content:space-between; gap:12px; padding:20px 22px 14px;
+    position:sticky; top:0; background:var(--surface); border-bottom:1px solid var(--line); z-index:1;
+  }
+  .dlg-head h3{margin:0; font:700 22px var(--serif)}
+  .dlg-head .close{padding:7px 12px}
+  .dlg-body{padding:20px 22px 24px; display:grid; gap:20px}
+  .dl{display:grid; grid-template-columns:110px 1fr; gap:8px 14px; margin:0}
+  .dl dt{color:var(--muted); font-size:13px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding-top:2px}
+  .dl dd{margin:0; word-break:break-word}
+  .dlg-sub{font-size:12px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); margin:0 0 8px}
+  .lines{border:1px solid var(--line); border-radius:14px; overflow:hidden}
+  .line{display:flex; justify-content:space-between; gap:12px; padding:11px 14px; border-bottom:1px solid var(--line)}
+  .line:last-child{border-bottom:0}
+  .line .q{color:var(--accent); font-weight:800; margin-right:8px}
+  .line.total{background:var(--surface-2); font-weight:800; font-size:17px}
+  .line.total span:last-child{font-family:var(--serif); font-size:20px}
+
   /* ---------- Toast ---------- */
   #toasts{position:fixed; right:18px; bottom:18px; z-index:50; display:grid; gap:10px; max-width:min(380px,calc(100vw - 36px))}
   .toast{
@@ -309,10 +350,10 @@
 
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button class="tab on" id="tabbtn-stock" data-tab="stock" role="tab" aria-selected="true" aria-controls="tab-stock">
-        Stock <span class="count" id="tc-stock">0</span>
+        📦 Stock <span class="count" id="tc-stock">0</span>
       </button>
       <button class="tab" id="tabbtn-orders" data-tab="orders" role="tab" aria-selected="false" aria-controls="tab-orders">
-        Orders <span class="count" id="tc-orders">0</span>
+        🧾 Orders <span class="count" id="tc-orders">0</span>
       </button>
     </nav>
 
@@ -345,6 +386,14 @@
   </main>
 </div>
 
+<dialog id="odlg" aria-labelledby="odlg-title">
+  <div class="dlg-head">
+    <h3 id="odlg-title">Order</h3>
+    <button id="odlg-close" class="ghost close" aria-label="Close">✕</button>
+  </div>
+  <div id="odlg-body" class="dlg-body"></div>
+</dialog>
+
 <div id="toasts" aria-live="polite"></div>
 
 <script>
@@ -374,6 +423,86 @@ function msg(text,type){
 }
 const money=c=>'$'+(Number(c)/100).toFixed(2);
 const level=n=>n<=0?'out':(n<=LOW?'low':'ok');
+
+/* ---------- order status + detail ---------- */
+const STATUSES=['pending','paid','processing','shipped','completed','cancelled'];
+const statusClass=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+
+// Dropdown + button that PATCHes the order status. `after(updatedRef)` runs once saved.
+function statusControl(o,after){
+  const wrap=el('div','status-edit');
+  const sel=document.createElement('select');
+  sel.setAttribute('aria-label','Order status for '+o.ref);
+  const cur=String(o.status||'').toLowerCase();
+  const opts=(!cur||STATUSES.includes(cur))?STATUSES:[cur,...STATUSES];
+  for(const s of opts){const op=el('option',null,s);op.value=s;sel.appendChild(op);}
+  sel.value=cur||STATUSES[0];
+  const initial=sel.value;
+
+  const btn=el('button','save idle','Update status');
+  btn.type='button';
+  sel.addEventListener('change',()=>btn.classList.toggle('idle',sel.value===initial));
+  btn.onclick=async()=>{
+    if(sel.value===initial)return;
+    btn.disabled=true; sel.disabled=true;
+    try{
+      await request('PATCH',{id_order:o.id,ref:o.ref,status:sel.value});
+      await refresh(true);
+      toast('Order '+o.ref+' → '+sel.value,'ok');
+      if(after)after(o.ref);
+    }catch(e){msg(e.message,'err');btn.disabled=false;sel.disabled=false;}
+  };
+  wrap.append(sel,btn);
+  return wrap;
+}
+
+function openOrder(o){
+  const dlg=$('odlg'), body=$('odlg-body');
+  $('odlg-title').textContent='Order '+o.ref;
+  body.replaceChildren();
+
+  // customer / info
+  const dl=el('dl','dl');
+  const row=(k,v)=>{ if(v===undefined||v===null||v==='')return; dl.appendChild(el('dt',null,k)); dl.appendChild(el('dd',null,v)); };
+  row('Customer',o.name);
+  row('Phone',o.phone);
+  row('Placed',new Date(o.created_at).toLocaleString());
+  row('Address',o.address);
+  row('Note',o.note||o.notes);
+  const stDd=el('dd'); stDd.appendChild(el('span','status '+statusClass(o.status),o.status||'—'));
+  dl.appendChild(el('dt',null,'Status')); dl.appendChild(stDd);
+  body.appendChild(dl);
+
+  // items
+  const itemsWrap=el('div');
+  itemsWrap.appendChild(el('p','dlg-sub','Items'));
+  const lines=el('div','lines');
+  for(const x of (o.items||[])){
+    const l=el('div','line');
+    const left=el('span');
+    left.appendChild(el('span','q',x.qty+'×'));
+    left.appendChild(document.createTextNode(x.name));
+    l.appendChild(left);
+    lines.appendChild(l);
+  }
+  const t=el('div','line total');
+  t.appendChild(el('span',null,'Total'));
+  t.appendChild(el('span',null,money(o.total_cents)));
+  lines.appendChild(t);
+  itemsWrap.appendChild(lines);
+  body.appendChild(itemsWrap);
+
+  // change status
+  const sw=el('div');
+  sw.appendChild(el('p','dlg-sub','Change status'));
+  sw.appendChild(statusControl(o,ref=>{
+    const fresh=state.orders.find(x=>x.ref===ref);
+    if(fresh)openOrder(fresh);
+  }));
+  body.appendChild(sw);
+
+  if(!dlg.open)dlg.showModal();
+}
 
 async function request(method,body){
   const r=await fetch('/api/admin',{
@@ -503,7 +632,7 @@ function renderOrders(){
     const r1=el('div','row1');
     r1.appendChild(el('span','o-name',o.name));
     const st=String(o.status||'');
-    r1.appendChild(el('span','status '+st.toLowerCase().replace(/[^a-z0-9]/g,''),st));
+    r1.appendChild(el('span','status '+statusClass(st),st));
     r1.appendChild(el('span','ref',o.ref));
     main.appendChild(r1);
     main.appendChild(el('div','meta',o.phone+' · '+new Date(o.created_at).toLocaleString()));
@@ -518,6 +647,14 @@ function renderOrders(){
     card.appendChild(main);
 
     card.appendChild(el('div','o-total',money(o.total_cents)));
+
+    const actions=el('div','o-actions');
+    const detailBtn=el('button','ghost','View details');
+    detailBtn.type='button';
+    detailBtn.onclick=()=>openOrder(o);
+    actions.append(detailBtn,statusControl(o));
+    card.appendChild(actions);
+
     box.appendChild(card);
   }
   if(!list.length){
@@ -585,6 +722,8 @@ $('refresh').onclick=async()=>{
   try{await refresh(false);}catch(e){msg(e.message,'err');}
 };
 $('logout').onclick=logout;
+$('odlg-close').onclick=()=>$('odlg').close();
+$('odlg').addEventListener('click',e=>{ if(e.target===$('odlg'))$('odlg').close(); }); // click backdrop to close
 document.querySelector('.tabs').addEventListener('click',e=>{
   const b=e.target.closest('.tab'); if(b)setTab(b.dataset.tab);
 });
