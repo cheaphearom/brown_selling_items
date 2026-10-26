@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https: data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<title>BROWN Shop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head><body style="margin:0">
+<div class="menu-app"><div class="menu-container">
+  <div id="menu-error" class="menu-alert" style="display:none"></div>
+  <div class="menu-title"><h1>Menu Listing</h1>
+    <span style="display:flex;gap:10px;align-items:center"><span class="menu-muted" id="menu-count">Loading…</span><button type="button" class="top-btn" id="btnMyOrders">My orders<span class="count-badge" id="ordersCount" hidden>0</span></button></span></div>
+  <div id="menu-root"><div class="menu-loading"><div class="spinner"></div><p>Loading menu…</p></div></div>
+</div></div>
+<button type="button" class="cart-fab" id="cartFab"></button>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalHeadTitle">
+  <div class="modal-box">
+    <div class="modal-head">
+      <button type="button" class="modal-close" id="modalClose" aria-label="Close">×</button>
+      <span class="modal-title" id="modalHeadTitle"></span><span class="spacer"></span>
+    </div>
+    <div class="steps" id="steps"></div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<div class="loader" id="loader" role="status" aria-live="polite">
+  <div class="spinner"></div><span id="loaderText">Please wait…</span>
+</div>
+
+<div class="alert-modal" id="alertBox" role="alertdialog" aria-modal="true" aria-labelledby="alertTitle" aria-describedby="alertMsg">
+  <div class="alert-box" id="alertInner">
+    <div class="alert-icon" id="alertIcon">!</div>
+    <h3 id="alertTitle"></h3>
+    <p id="alertMsg"></p>
+    <button type="button" class="btn btn-primary" id="alertOk">OK</button>
+  </div>
+</div>
+
+<script src="app.js" defer></script>
+</body></html>

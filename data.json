@@ -1,0 +1,106 @@
+{
+  "code": "100",
+  "result": {
+    "total": 6,
+    "data": [
+      {
+        "id_menu_group": "1",
+        "group_name": "Coffee",
+        "id_menu_category": "520161962052305249",
+        "category_name": "Hot Drinks",
+        "id_menu": "1001",
+        "menu_name": "Hot Latte",
+        "menu_price": "2.50",
+        "menu_discount": 0,
+        "menu_picture": "null",
+        "index_number": 1,
+        "status": 3,
+        "menu_stock": 20,
+        "deleted_date": "1900-01-01"
+      },
+      {
+        "id_menu_group": "1",
+        "group_name": "Coffee",
+        "id_menu_category": "520161962052305249",
+        "category_name": "Hot Drinks",
+        "id_menu": "1002",
+        "menu_name": "Hot Americano",
+        "menu_price": "2.00",
+        "menu_discount": 20,
+        "menu_picture": "null",
+        "index_number": 2,
+        "status": 3,
+        "menu_stock": 15,
+        "deleted_date": "1900-01-01"
+      },
+      {
+        "id_menu_group": "1",
+        "group_name": "Coffee",
+        "id_menu_category": "520161962052305249",
+        "category_name": "Hot Drinks",
+        "id_menu": "1003",
+        "menu_name": "Cappuccino",
+        "menu_price": "2.75",
+        "menu_discount": 0,
+        "menu_picture": "null",
+        "index_number": 3,
+        "status": 3,
+        "menu_stock": 0,
+        "deleted_date": "1900-01-01"
+      },
+      {
+        "id_menu_group": "2",
+        "group_name": "Cold Drinks",
+        "id_menu_category": "520161962052305250",
+        "category_name": "Iced Coffee",
+        "id_menu": "2001",
+        "menu_name": "Iced Latte",
+        "menu_price": "3.00",
+        "menu_discount": 10,
+        "menu_picture": "null",
+        "index_number": 1,
+        "status": 3,
+        "menu_stock": 30,
+        "deleted_date": "1900-01-01"
+      },
+      {
+        "id_menu_group": "2",
+        "group_name": "Cold Drinks",
+        "id_menu_category": "520161962052305250",
+        "category_name": "Iced Coffee",
+        "id_menu": "2002",
+        "menu_name": "Iced Americano",
+        "menu_price": "2.50",
+        "menu_discount": 0,
+        "menu_picture": "https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5?w=600",
+        "index_number": 2,
+        "status": 3,
+        "menu_stock": 25,
+        "deleted_date": "1900-01-01"
+      },
+      {
+        "id_menu_group": "2",
+        "group_name": "Cold Drinks",
+        "id_menu_category": "520161962052305250",
+        "category_name": "Iced Coffee",
+        "id_menu": "2003",
+        "menu_name": "Hidden test item (status 0)",
+        "menu_price": "1.00",
+        "menu_discount": 0,
+        "menu_picture": "null",
+        "index_number": 3,
+        "status": 0,
+        "menu_stock": 5,
+        "deleted_date": "1900-01-01"
+      }
+    ]
+  },
+  "loyalty_cards": [
+    {
+      "card_number": "10000001",
+      "serial_number": "ABC123",
+      "name": "Sample Member",
+      "points": 120
+    }
+  ]
+}
