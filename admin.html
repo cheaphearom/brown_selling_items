@@ -425,7 +425,7 @@ const money=c=>'$'+(Number(c)/100).toFixed(2);
 const level=n=>n<=0?'out':(n<=LOW?'low':'ok');
 
 /* ---------- order status + detail ---------- */
-const STATUSES=['pending','paid','processing','shipped','completed','cancelled'];
+const STATUSES=['pending','paid', 'completed','cancelled'];
 const statusClass=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
 
 // Dropdown + button that PATCHes the order status. `after(updatedRef)` runs once saved.
