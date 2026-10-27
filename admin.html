@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
-<title>BROWN Shop — Inventory</title>
+<title>BROWN COFFEE Shop — Inventory</title>
 <link rel="icon" type="image/png" href="img/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600;700&display=swap" rel="stylesheet">
@@ -30,7 +30,7 @@
     --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
     --sans:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
   }
-  @media (prefers-color-scheme:dark){
+  /* @media (prefers-color-scheme:dark){
     :root{
       --bg:#17120e; --surface:#231c16; --surface-2:#2b231c;
       --ink:#f3ece0; --muted:#b3a692; --line:#372d24; --line-strong:#54463a;
@@ -41,7 +41,7 @@
       --info:#a9c4ea; --info-bg:#1e2a3b;
       --shadow:0 1px 0 rgba(255,255,255,.03);
     }
-  }
+  } */
 
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
@@ -72,7 +72,7 @@
     background:linear-gradient(135deg,var(--brand-2),var(--brand)); color:#fff;
     box-shadow:0 4px 14px rgba(59,39,24,.25);
   }
-  @media (prefers-color-scheme:dark){ button{color:#1b1209} }
+  /* @media (prefers-color-scheme:dark){ button{color:#1b1209} } */
   button:hover{transform:translateY(-1px); filter:brightness(1.08)}
   button:active{transform:translateY(0)}
   button:disabled{opacity:.5; cursor:not-allowed; transform:none; filter:none}
@@ -151,7 +151,7 @@
   }
   .chips button:hover{transform:none; filter:none; color:var(--ink)}
   .chips button.on{background:var(--accent-soft); color:var(--brand-2)}
-  @media (prefers-color-scheme:dark){ .chips button.on{color:var(--accent)} }
+  /* @media (prefers-color-scheme:dark){ .chips button.on{color:var(--accent)} } */
 
   /* ---------- Product cards ---------- */
   .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(310px,1fr)); gap:16px}
@@ -194,11 +194,12 @@
   .editor .save.idle:hover{transform:none; filter:none}
 
   /* ---------- Product image + actions ---------- */
+  /* IMAGE CHANGE: square box, photo fills it (was 4/3) */
   .pmedia{
-    aspect-ratio:4/3; overflow:hidden; display:grid; place-items:center;
+    aspect-ratio:1/1; overflow:hidden; display:grid; place-items:center;
     background:linear-gradient(145deg,var(--accent-soft),var(--surface-2));
   }
-  .pmedia img{width:100%; height:100%; object-fit:cover; display:block}
+  .pmedia img{width:100%; height:100%; object-fit:cover; object-position:center; display:block}
   .pph{font:700 56px var(--serif); color:var(--accent); opacity:.85}
   .pcard .pmedia{margin:-18px -18px 0; border-radius:var(--radius) var(--radius) 0 0}
   .pactions{display:flex; gap:8px; padding-top:14px; border-top:1px dashed var(--line)}
@@ -214,7 +215,7 @@
     width:46px; height:46px; border-radius:50%; display:grid; place-items:center;
     font:700 18px var(--serif); color:var(--brand-2); background:var(--accent-soft);
   }
-  @media (prefers-color-scheme:dark){ .avatar{color:var(--accent)} }
+  /* @media (prefers-color-scheme:dark){ .avatar{color:var(--accent)} } */
   .o-main .row1{display:flex; flex-wrap:wrap; align-items:center; gap:8px}
   .o-name{font-weight:700}
   .ref{font-size:12px; font-weight:700; letter-spacing:.05em; color:var(--muted); background:var(--surface-2); border:1px solid var(--line); padding:2px 8px; border-radius:8px}
@@ -247,7 +248,7 @@
     background:linear-gradient(135deg,var(--brand-2),var(--brand)); color:#fff;
     box-shadow:0 4px 14px rgba(59,39,24,.25);
   }
-  @media (prefers-color-scheme:dark){ .tab.on{color:#1b1209} }
+  /* @media (prefers-color-scheme:dark){ .tab.on{color:#1b1209} } */
   .tab .count{
     min-width:24px; padding:1px 8px; border-radius:99px; font-size:12px; font-weight:800; text-align:center;
     background:var(--accent-soft); color:var(--brand-2);
@@ -299,7 +300,8 @@
   .line .q{color:var(--accent); font-weight:800; margin-right:8px}
   .line.total{background:var(--surface-2); font-weight:800; font-size:17px}
   .line.total span:last-child{font-family:var(--serif); font-size:20px}
-  .dlg-body .pmedia{border-radius:16px; aspect-ratio:16/10}
+  /* IMAGE CHANGE: square photo in the dialog too (was 16/10), kept to a sensible size */
+  .dlg-body .pmedia{border-radius:16px; aspect-ratio:1/1; width:100%; max-width:360px; margin:0 auto}
   .dlg-actions{display:flex; gap:10px; flex-wrap:wrap}
   .dlg-actions button{flex:1}
   .field{display:grid; gap:6px}
@@ -313,7 +315,7 @@
     padding:13px 16px; border-radius:14px; font-weight:600; box-shadow:0 12px 30px rgba(0,0,0,.25);
     background:var(--brand); color:#fff; animation:in .25s ease; display:flex; gap:10px; align-items:center;
   }
-  @media (prefers-color-scheme:dark){ .toast{color:#1b1209} }
+  /* @media (prefers-color-scheme:dark){ .toast{color:#1b1209} } */
   .toast.ok{background:var(--ok); color:#fff}
   .toast.err{background:var(--bad); color:#fff}
   @keyframes in{from{opacity:0; transform:translateY(10px) scale(.98)}to{opacity:1; transform:none}}
@@ -339,8 +341,8 @@
 <section id="auth">
   <div class="hero">
     <!-- <div class="logo" aria-hidden="true">B</div> -->
-     <img style="height: 100px;width: auto;display: block;" src="img/logo.png" alt="BROWN Shop" class="logo">
-    <h1>BROWN <em>Shop</em></h1>
+     <img style="height: 100px;width: auto;display: block;" src="img/logo.png" alt="BROWN COFFEE Shop" class="logo">
+    <h1>BROWN COFFEE <em>Shop</em></h1>
     <p>Manage your stock and keep an eye on the latest orders, all in one place.</p>
     <div class="login">
       <label for="token">Admin token</label>
@@ -360,8 +362,8 @@
     <div class="wrap">
       <div class="tb-brand">
         <!-- <div class="tb-logo" aria-hidden="true">B</div> -->
-        <img style="width: auto;display: block;" src="img/logo.png" alt="BROWN Shop" class="tb-logo">
-        <div class="tb-title">BROWN Shop<small>Inventory &amp; Orders</small></div>
+        <img style="width: auto;display: block;" src="img/logo.png" alt="BROWN COFFEE Shop" class="tb-logo">
+        <div class="tb-title">BROWN COFFEE Shop<small>Inventory &amp; Orders</small></div>
       </div>
       <div class="tb-actions">
         <button id="refresh" class="ghost">↻ Refresh</button>
@@ -409,7 +411,7 @@
       <div id="orders" class="orders"></div>
     </section>
 
-    <footer>BROWN Shop admin · data refreshes whenever you press Refresh</footer>
+    <footer>BROWN COFFEE Shop admin · data refreshes whenever you press Refresh</footer>
   </main>
 </div>
 
