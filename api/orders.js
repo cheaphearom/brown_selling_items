@@ -1,6 +1,7 @@
 
 const { getPool } = require('../lib/db');
 const { json } = require('../lib/http');
+const { sendOrderToTelegram } = require('../lib/telegram');
 const {
   validateCredentials,
   cardFingerprint
@@ -282,18 +283,27 @@ module.exports = async (req, res) => {
     await client.query('COMMIT');
     transactionStarted = false;
 
+    const order = {
+      ref,
+      at: Date.now(),
+      name,
+      phone,
+      loyalty,
+      items: lines,
+      total: totalCents / 100
+    };
+
+    // Telegram must never break the order, so errors are only logged
+    try {
+      await sendOrderToTelegram(order);
+    } catch (tgError) {
+      console.error('Telegram notify failed:', tgError);
+    }
+
     return json(res, 201, {
       success: true,
       message: 'Order placed successfully.',
-      order: {
-        ref,
-        at: Date.now(),
-        name,
-        phone,
-        loyalty,
-        items: lines,
-        total: totalCents / 100
-      }
+      order
     });
 
   } catch (e) {
