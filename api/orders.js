@@ -4,7 +4,8 @@ const { json } = require('../lib/http');
 const { sendOrderToTelegram } = require('../lib/telegram');
 const {
   validateCredentials,
-  cardFingerprint
+  cardFingerprint,
+  verifySerial
 } = require('../lib/loyalty');
 
 const DUPLICATE_MESSAGE =
@@ -43,7 +44,12 @@ module.exports = async (req, res) => {
       error: 'Invalid loyalty card. Only staff cards starting with 999 are allowed.'
     });
   }
-
+  // NEW: serial must match the card number (port of PHP GetCardSerial)
+  if (!verifySerial(cardNumber, credentials.serial)) {
+    return json(res, 400, {
+      error: 'Card number and serial number do not match.'
+    });
+  }
   const loyalty = '•••• ' + cardNumber.slice(-4);
 
   // Validate customer and order details
