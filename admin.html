@@ -405,6 +405,7 @@
         <h2>Latest 100 orders<span id="ocount"></span></h2>
         <div class="tools">
           <input id="osearch" class="search" type="search" placeholder="Search name, phone, ref, card last 4…" aria-label="Search orders">
+          <select id="ofilter" aria-label="Filter orders by status"></select>
           <button id="exp-orders" class="ghost" type="button">⬇ Export Excel</button>
         </div>
       </div>
@@ -440,6 +441,7 @@ const $=id=>document.getElementById(id);
 let token='';
 let state={products:[],orders:[]};
 let pFilter='all';
+let oFilter='all';
 const LOW=5;
 const MAX_STOCK=1000000;
 // Orders with these statuses are not counted as revenue.
@@ -467,7 +469,7 @@ const money=c=>'$'+((Number(c)||0)/100).toFixed(2);
 const stockNum=v=>{const n=Number(v);return Number.isFinite(n)?n:0;};   // null / NaN -> 0
 const level=n=>{n=stockNum(n);return n<=0?'out':(n<=LOW?'low':'ok');};
 
-// Never show a full card number in the admin: last 4 characters only.
+// On screen, show the last 4 characters of a card only. The full number appears only in the Excel export.
 const last4=v=>String(v||'').replace(/[^\w]/g,'').slice(-4);
 const maskCard=v=>last4(v)?'•••• '+last4(v):'';
 
@@ -805,11 +807,14 @@ function filteredProducts(){
     return !q||String(p.name).toLowerCase().includes(q);
   });
 }
-// Orders matching the current search (also used by the export).
+// Orders matching the current search + status filter (also used by the export).
 // Card search matches the last 4 characters only, never the full number.
 function filteredOrders(){
   const q=$('osearch').value.trim().toLowerCase();
-  return state.orders.filter(o=>!q||[o.ref,o.name,o.phone,last4(o.card_number||o.loyalty)].some(v=>String(v||'').toLowerCase().includes(q)));
+  return state.orders.filter(o=>{
+    if(oFilter!=='all'&&String(o.status||'').toLowerCase()!==oFilter)return false;
+    return !q||[o.ref,o.name,o.phone,last4(o.card_number||o.loyalty)].some(v=>String(v||'').toLowerCase().includes(q));
+  });
 }
 
 function renderProducts(){
@@ -826,7 +831,28 @@ function renderProducts(){
   $('pcount').textContent=list.length===state.products.length?state.products.length+' items':list.length+' of '+state.products.length;
 }
 
+// Status filter dropdown with order counts. Statuses that aren't in STATUSES (like "placed",
+// which new orders start with) come from the orders themselves, so no order is unreachable.
+function renderOrderFilter(){
+  const counts={};
+  for(const o of state.orders){
+    const s=String(o.status||'').toLowerCase();
+    if(s)counts[s]=(counts[s]||0)+1;
+  }
+  const extras=Object.keys(counts).filter(s=>!STATUSES.includes(s));
+  if(oFilter!=='all'&&!STATUSES.includes(oFilter)&&!extras.includes(oFilter))extras.push(oFilter);   // keep the active filter visible
+  const box=$('ofilter'); box.replaceChildren();
+  for(const s of ['all',...extras,...STATUSES]){
+    const label=s[0].toUpperCase()+s.slice(1);
+    const op=el('option',null,label+' ('+(s==='all'?state.orders.length:(counts[s]||0))+')');
+    op.value=s;
+    box.appendChild(op);
+  }
+  box.value=oFilter;
+}
+
 function renderOrders(){
+  renderOrderFilter();
   const list=filteredOrders();
   const box=$('orders'); box.replaceChildren();
   for(const o of list){
@@ -865,10 +891,10 @@ function renderOrders(){
   if(!list.length){
     const e=el('div','empty');
     e.appendChild(el('big',null,'🧾'));
-    e.appendChild(document.createTextNode(state.orders.length?'No orders match your search.':'No orders yet.'));
+    e.appendChild(document.createTextNode(state.orders.length?'No orders match your search or filter.':'No orders yet.'));
     box.appendChild(e);
   }
-  $('ocount').textContent=state.orders.length+' orders';
+  $('ocount').textContent=list.length===state.orders.length?state.orders.length+' orders':list.length+' of '+state.orders.length;
 }
 
 function renderAll(){
@@ -919,7 +945,7 @@ function logout(){
   for(const id of ['odlg','pdlg']){const d=$(id); if(d.open)d.close(); $(id+'-body').replaceChildren();}
   token=''; state={products:[],orders:[]};
   $('token').value='';
-  $('psearch').value=''; $('osearch').value='';
+  $('psearch').value=''; $('osearch').value=''; oFilter='all'; $('ofilter').replaceChildren();
   $('products').replaceChildren(); $('orders').replaceChildren(); $('stats').replaceChildren();
   $('dashboard').hidden=true; $('auth').hidden=false;
   msg('');
@@ -956,7 +982,7 @@ function exportOrders(){
       new Date(o.created_at).toLocaleString(),
       o.name,
       {text:o.phone},
-      maskCard(o.card_number||o.loyalty),            // masked only, never the full number or serial
+      {text:o.card_number||''},           // full number as text so Excel doesn't round it
       o.status,
       (o.items||[]).map(x=>x.qty+'× '+x.name).join('; '),
       ((Number(o.total_cents)||0)/100).toFixed(2)    // plain number so Excel can sum it
@@ -1009,6 +1035,10 @@ document.querySelector('.tabs').addEventListener('keydown',e=>{
 setTab(location.hash.replace('#',''));
 $('psearch').addEventListener('input',renderProducts);
 $('osearch').addEventListener('input',renderOrders);
+$('ofilter').addEventListener('change',e=>{
+  oFilter=e.target.value;
+  renderOrders();
+});
 $('pfilter').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b)return;
   pFilter=b.dataset.f;
